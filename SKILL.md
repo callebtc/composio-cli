@@ -1,6 +1,6 @@
 ---
 name: composio-cli
-description: Use the composio-cli in this repository whenever the user wants to operate connected Composio toolkits through a CLI instead of writing SDK code directly. Trigger this skill for email, calendar, docs, maps, drive, sheets, Slack, GitHub, Notion, Linear, Jira, HubSpot, Salesforce, Airtable, Asana, Trello, Discord, Twitter, WhatsApp, Stripe, Zendesk, Dropbox, Figma, YouTube, Spotify, Composio Search, and any other connected toolkit exposed by this CLI. If the user wants to read email, send email, inspect calendars, list events, search documents, query places, or execute any Composio action from the terminal, use this skill and call `node dist/cli.js ...`.
+description: "Use this skill whenever the user wants to interact with email, calendars, documents, maps, drive files, spreadsheets, chat tools, issue trackers, CRMs, design tools, storage tools, media tools, search tools, or similar connected services from the terminal. Trigger it for Gmail, Google Calendar, Google Docs, Google Maps, Google Drive, Google Sheets, Slack, GitHub, Notion, Linear, Jira, HubSpot, Salesforce, Airtable, Asana, Trello, Discord, Twitter, WhatsApp, Stripe, Zendesk, Dropbox, Figma, YouTube, Spotify, search, and other connected services."
 ---
 
 # composio-cli
@@ -26,26 +26,32 @@ Use this skill when the user wants to:
 pnpm build
 ```
 
-2. Discover connected toolkits for the current API key.
+2. Set the API key once for the session.
 
 ```bash
-node dist/cli.js --api-key "$COMPOSIO_API_KEY"
-node dist/cli.js toolkits --api-key "$COMPOSIO_API_KEY"
-node dist/cli.js connections --api-key "$COMPOSIO_API_KEY"
+export COMPOSIO_API_KEY="..."
 ```
 
-3. Inspect live actions for one toolkit.
+3. Discover connected toolkits and connections.
 
 ```bash
-node dist/cli.js <toolkit> actions --api-key "$COMPOSIO_API_KEY"
-node dist/cli.js <toolkit> inspect <action> --api-key "$COMPOSIO_API_KEY"
+node dist/cli.js
+node dist/cli.js toolkits
+node dist/cli.js connections
 ```
 
-4. Execute the action.
+4. Inspect live actions for one toolkit.
 
 ```bash
-node dist/cli.js <toolkit> <action> --api-key "$COMPOSIO_API_KEY" --flag value
-node dist/cli.js <toolkit> <action> --api-key "$COMPOSIO_API_KEY" --input '{"key":"value"}'
+node dist/cli.js <toolkit> actions
+node dist/cli.js <toolkit> inspect <action>
+```
+
+5. Execute the action.
+
+```bash
+node dist/cli.js <toolkit> <action> --flag value
+node dist/cli.js <toolkit> <action> --input '{"key":"value"}'
 ```
 
 ## Important behavior
@@ -60,12 +66,13 @@ node dist/cli.js <toolkit> <action> --api-key "$COMPOSIO_API_KEY" --input '{"key
 
 ## Authentication
 
-Use either:
+Set the API key once at the beginning:
 
-- `--api-key <key>`
-- `COMPOSIO_API_KEY`
+```bash
+export COMPOSIO_API_KEY="..."
+```
 
-If needed, target a specific Composio user with:
+If needed, target a specific user with:
 
 ```bash
 --user <id>
@@ -82,42 +89,81 @@ Prefer this sequence:
 
 This keeps the agent grounded in what is actually connected and avoids inventing unsupported action names.
 
-## Examples
+## Important examples
 
-Read the latest 5 emails:
+Start with:
 
 ```bash
-node dist/cli.js gmail fetch-emails --api-key "$COMPOSIO_API_KEY" --max-results 5
+node dist/cli.js
+node dist/cli.js toolkits
+node dist/cli.js gmail actions
+node dist/cli.js gmail inspect fetch-emails
 ```
 
-Get the full JSON for those emails:
+Gmail:
 
 ```bash
-node dist/cli.js gmail fetch-emails --api-key "$COMPOSIO_API_KEY" --max-results 5 --json
+node dist/cli.js gmail fetch-emails --max-results 5
+node dist/cli.js gmail fetch-emails --max-results 5 --fields subject,date
+node dist/cli.js gmail fetch-emails --max-results 5 --ids-only
+node dist/cli.js gmail fetch-message-by-message-id --message-id <message-id> --json
+node dist/cli.js gmail create-email-draft --recipient a@example.com --subject "Hi" --body "Hello"
+node dist/cli.js gmail send-email --recipient a@example.com --subject "Hi" --body "Hello"
+node dist/cli.js gmail search-people --query "Alice"
+node dist/cli.js gmail list-labels
 ```
 
-List calendars:
+Google Calendar:
 
 ```bash
-node dist/cli.js google-calendar list-calendars --api-key "$COMPOSIO_API_KEY"
+node dist/cli.js google-calendar list-calendars
+node dist/cli.js google-calendar events-list --calendar-id primary
+node dist/cli.js google-calendar events-get --calendar-id primary --event-id <event-id> --json
+node dist/cli.js google-calendar create-event --calendar-id primary --summary "Standup" --start-datetime <iso> --end-datetime <iso>
+node dist/cli.js google-calendar find-free-slots --items '["primary"]' --time-min <iso> --time-max <iso>
+node dist/cli.js google-calendar find-event --calendar-id primary --query "meeting"
 ```
 
-List upcoming calendar events:
+Google Docs:
 
 ```bash
-node dist/cli.js google-calendar events-list --api-key "$COMPOSIO_API_KEY" --calendar-id primary
+node dist/cli.js google-docs actions
+node dist/cli.js google-docs create-document --title "Draft"
+node dist/cli.js google-docs get-document-by-id --document-id <doc-id> --json
+node dist/cli.js google-docs get-document-plaintext --document-id <doc-id>
+node dist/cli.js google-docs search-documents --query "Q1 plan"
+node dist/cli.js google-docs update-document-markdown --document-id <doc-id> --markdown "# Title"
 ```
 
-Search Google Docs actions:
+Google Maps:
 
 ```bash
-node dist/cli.js google-docs actions --api-key "$COMPOSIO_API_KEY"
+node dist/cli.js google-maps actions
+node dist/cli.js google-maps text-search --text-query "coffee near Alexanderplatz"
+node dist/cli.js google-maps nearby-search --location <lat,lng> --radius 1000
+node dist/cli.js google-maps get-place-details --place-id <place-id>
+node dist/cli.js google-maps get-route --origin "Berlin" --destination "Munich"
+node dist/cli.js google-maps autocomplete --input "berlin cen"
 ```
 
-Inspect Google Maps actions:
+Other common toolkit entry points:
 
 ```bash
-node dist/cli.js google-maps actions --api-key "$COMPOSIO_API_KEY"
+node dist/cli.js google-drive actions
+node dist/cli.js google-sheets actions
+node dist/cli.js slack actions
+node dist/cli.js github actions
+node dist/cli.js notion actions
+node dist/cli.js linear actions
+node dist/cli.js jira actions
+node dist/cli.js airtable actions
+node dist/cli.js asana actions
+node dist/cli.js trello actions
+node dist/cli.js dropbox actions
+node dist/cli.js figma actions
+node dist/cli.js youtube actions
+node dist/cli.js spotify actions
+node dist/cli.js composio-search actions
 ```
 
 ## Agent guidance
