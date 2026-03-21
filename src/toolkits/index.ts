@@ -97,18 +97,16 @@ function buildRuntimeToolkitDefinition(
     }
     return left.cliName.localeCompare(right.cliName);
   });
-  const featuredActions = rankedActions.slice(0, 10).map(action => ({
-    canonical: action.cliName,
-    priority: scoreRuntimeAction(action),
-    shortHelp: summarizeRuntimeAction(action),
-  })) satisfies FeaturedToolkitAction[];
-  const capabilities = inferRuntimeCapabilities(rankedActions, base?.capabilities ?? []);
+  const featuredActions = buildFeaturedActions(rankedActions, base);
+  const capabilities =
+    base?.capabilities.length
+      ? base.capabilities
+      : inferRuntimeCapabilities(rankedActions);
   const summary =
-    rankedActions.length === 0 && base?.summary
-      ? base.summary
-      : capabilities.length > 0
+    base?.summary ??
+    (capabilities.length > 0
       ? capabilities.slice(0, 4).join(", ")
-      : `${rankedActions.length} discovered actions`;
+      : `${rankedActions.length} discovered actions`);
   const readCheckActions = rankedActions
     .filter(action => isReadLikeRuntimeAction(action))
     .slice(0, 3)
@@ -121,13 +119,13 @@ function buildRuntimeToolkitDefinition(
     ...(base?.toolPrefix ? { toolPrefix: base.toolPrefix } : {}),
     displayName,
     summary,
-    capabilities:
-      capabilities.length > 0 ? capabilities : (base?.capabilities.length ? base.capabilities : ["actions"]),
+    capabilities: capabilities.length > 0 ? capabilities : ["actions"],
     examples:
       rankedActions.length > 0
         ? rankedActions.slice(0, 3).map(action => action.cliName)
         : base?.examples ?? [],
-    readCheckActions: readCheckActions.length > 0 ? readCheckActions : (base?.readCheckActions ?? []),
+    readCheckActions:
+      base?.readCheckActions.length ? base.readCheckActions : (readCheckActions.length > 0 ? readCheckActions : []),
     featuredActions: featuredActions.length > 0 ? featuredActions : (base?.featuredActions ?? []),
     ...(base?.aliases ? { aliases: base.aliases } : {}),
     ...(base?.outputSummary ? { outputSummary: base.outputSummary } : {}),
@@ -144,16 +142,73 @@ function formatRuntimeToolkitDisplayName(apiSlug: string): string {
 }
 
 function scoreRuntimeAction(action: ToolkitAction): number {
-  const text = `${action.cliName} ${action.description ?? ""}`.toLowerCase();
+  const text = `${action.cliName} ${(action.description ?? "").toLowerCase()}`;
+  const tokens = action.cliName.toLowerCase().split("-").filter(Boolean);
+  const first = tokens[0] ?? "";
+  const hasToken = (candidates: string[]) => candidates.some(candidate => tokens.includes(candidate));
   let score = 0;
-  if (/\b(create|new|insert|add|draft)\b/.test(text)) score += 90;
-  if (/\b(get|fetch|list|search|find|lookup|read)\b/.test(text)) score += 100;
-  if (/\bupdate|patch|edit|replace|move|copy|upload|append|send|post\b/.test(text)) score += 80;
-  if (/\bdelete|remove|trash|destroy\b/.test(text)) score += 20;
-  if (/\bexport|download\b/.test(text)) score += 70;
-  if (/\bimage|photo|video|audio|media\b/.test(text)) score += 40;
-  if (/\bdeprecated\b/.test(text)) score -= 50;
+
+  if (hasToken(["fetch", "search", "find", "lookup", "list", "get", "read"])) score += 100;
+  if (hasToken(["create", "send", "post", "upload", "append", "write"])) score += 85;
+  if (hasToken(["update", "patch", "edit", "replace", "move", "copy"])) score += 55;
+  if (hasToken(["delete", "remove", "trash", "destroy", "stop"])) score -= 20;
+
+  if (["fetch", "search", "find", "lookup", "list", "get", "read"].includes(first)) score += 20;
+  if (["create", "send", "post", "upload", "append", "write"].includes(first)) score += 10;
+
+  if (/\b(email|message|thread|document|doc|event|calendar|file|folder|sheet|spreadsheet|channel|issue|repo|page|database|task|project|contact|deal|ticket|record|board|card|place|route|video|playlist|invoice|lead)\b/.test(text)) {
+    score += 60;
+  }
+  if (/\b(draft|attachment|label|photo|image|caption|calendar|calendars|playlist|branch|commit|pull|pr)\b/.test(text)) {
+    score += 25;
+  }
+  if (/\b(settings?|config|history|smime|cse|forwarding|send-as|vacation|imap|pop|language|footer|header|footnote|named-range|bullets?|table|row|column|style|session|tile|watch)\b/.test(text)) {
+    score -= 45;
+  }
+  if (/\bdeprecated\b/.test(text)) score -= 80;
   return score;
+}
+
+function buildFeaturedActions(
+  rankedActions: ToolkitAction[],
+  base?: ToolkitDefinition
+): FeaturedToolkitAction[] {
+  const matched = new Set<string>();
+  const seeded = (base?.featuredActions ?? [])
+    .map(feature => {
+      const action = rankedActions.find(candidate => matchesFeatureCandidate(candidate, feature));
+      if (!action) {
+        return undefined;
+      }
+      matched.add(action.cliName);
+      return {
+        canonical: action.cliName,
+        priority: feature.priority,
+        shortHelp: summarizeRuntimeAction(action),
+        ...(feature.aliases ? { aliases: feature.aliases } : {}),
+      } satisfies FeaturedToolkitAction;
+    })
+    .filter((entry): entry is FeaturedToolkitAction => Boolean(entry));
+
+  const inferred = rankedActions
+    .filter(action => !matched.has(action.cliName))
+    .slice(0, Math.max(0, 10 - seeded.length))
+    .map(action => ({
+      canonical: action.cliName,
+      priority: scoreRuntimeAction(action),
+      shortHelp: summarizeRuntimeAction(action),
+    }) satisfies FeaturedToolkitAction);
+
+  return [...seeded, ...inferred];
+}
+
+function matchesFeatureCandidate(action: ToolkitAction, feature: FeaturedToolkitAction): boolean {
+  const actionCandidates = new Set(
+    [action.cliName, action.slug, ...action.aliases].map(value => normalizeToken(value))
+  );
+  return [feature.canonical, ...(feature.aliases ?? [])]
+    .map(value => normalizeToken(value))
+    .some(value => actionCandidates.has(value));
 }
 
 function summarizeRuntimeAction(action: ToolkitAction): string {
@@ -165,7 +220,7 @@ function summarizeRuntimeAction(action: ToolkitAction): string {
   return truncate(sentence, 80);
 }
 
-function inferRuntimeCapabilities(actions: ToolkitAction[], seed: string[] = []): string[] {
+function inferRuntimeCapabilities(actions: ToolkitAction[]): string[] {
   const categories = [
     { label: "search", patterns: [/\bsearch\b/, /\bfind\b/, /\blookup\b/, /\bautocomplete\b/, /\bquery\b/] },
     { label: "read", patterns: [/\bget\b/, /\bfetch\b/, /\bread\b/, /\blist\b/, /\binspect\b/] },
@@ -186,13 +241,12 @@ function inferRuntimeCapabilities(actions: ToolkitAction[], seed: string[] = [])
 
   const text = actions
     .slice(0, 20)
-    .map(action => `${action.cliName} ${action.description ?? ""}`.toLowerCase())
+    .map(action => action.cliName.toLowerCase())
     .join(" ");
 
-  const inferred = categories
+  return categories
     .filter(category => category.patterns.some(pattern => pattern.test(text)))
     .map(category => category.label);
-  return [...new Set([...seed, ...inferred])];
 }
 
 function isReadLikeRuntimeAction(action: ToolkitAction): boolean {

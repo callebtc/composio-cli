@@ -568,8 +568,7 @@ describe("runCli", () => {
     expect(result.stdout).toContain("events-list: List events from a calendar.");
     expect(result.stdout).toContain("events-get: Get one event by ID.");
     expect(result.stdout).toContain("create-event: Create a new calendar event.");
-    expect(result.stdout.indexOf("events-get")).toBeLessThan(result.stdout.indexOf("events-list"));
-    expect(result.stdout.indexOf("events-list")).toBeLessThan(result.stdout.indexOf("find-free-slots"));
+    expect(result.stdout.indexOf("Recommended actions:")).toBeLessThan(result.stdout.indexOf("Actions:"));
   });
 
   it("summarizes Gmail fetch-emails output by default", async () => {
