@@ -1,10 +1,12 @@
 import { API_KEY_ENV, CLI_NAME, DEFAULT_USER_ID, TOOLKIT_PREVIEW_LIMIT } from "./constants.js";
 import type {
   ConnectedAccountSummary,
+  ExecuteActionResult,
   JsonSchemaObject,
   JsonSchemaProperty,
   ToolkitAction,
 } from "./types.js";
+import { hasSummaryDefault, renderSummarizedExecutionResult } from "./summaries.js";
 import type { ToolkitDefinition } from "./toolkits/shared.js";
 import { indent, pluralize, titleCaseWords, toFlagName, truncate } from "./utils/strings.js";
 
@@ -145,6 +147,10 @@ export function renderActionGuide(toolkit: ToolkitDefinition, action: ToolkitAct
     `  --tool-version <id>     Override the discovered tool version for this call.`,
     ...propertyLines,
     "",
+    hasSummaryDefault(toolkit, action)
+      ? "Default text output is summarized for this Gmail action. Use --json for the full response."
+      : undefined,
+    hasSummaryDefault(toolkit, action) ? "" : undefined,
     required.length > 0
       ? `Required top-level fields: ${required.join(", ")}`
       : "Required top-level fields: none",
@@ -189,15 +195,17 @@ export function renderConnections(
 export function renderExecutionResult(result: {
   action: ToolkitAction;
   toolkit: ToolkitDefinition;
-  execution: {
-    successful: boolean;
-    data: unknown;
-    error?: string | null | undefined;
-    logId?: string | undefined;
-    version?: string | undefined;
-  };
+  execution: ExecuteActionResult;
 }): string {
   const { action, toolkit, execution } = result;
+  const summarized = renderSummarizedExecutionResult({
+    action,
+    toolkit,
+    execution: result.execution,
+  });
+  if (summarized) {
+    return summarized;
+  }
 
   return [
     `${toolkit.displayName} / ${action.cliName}`,

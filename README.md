@@ -38,9 +38,14 @@ node dist/cli.js gmail inspect fetch-emails --api-key "$COMPOSIO_API_KEY"
 # 5. Execute it with flags
 node dist/cli.js gmail fetch-emails --api-key "$COMPOSIO_API_KEY" --max-results 5
 
-# 6. Execute it with JSON
+# 6. Ask for the full response instead of the default summary
+node dist/cli.js gmail fetch-emails --api-key "$COMPOSIO_API_KEY" --max-results 5 --json
+
+# 7. Execute it with JSON
 node dist/cli.js gmail fetch-emails --api-key "$COMPOSIO_API_KEY" --input '{"query":"from:billing"}'
 ```
+
+Large Gmail read commands default to a compact text summary. For example, `fetch-emails` shows the message ID, sender, subject, date, labels, and a preview capped at 100 characters. Use `--json` when the agent needs the full payload.
 
 ## Development
 

@@ -116,7 +116,87 @@ describe("runCli", () => {
 
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toContain("Gmail / fetch-emails");
+    expect(result.stdout).toContain("Default text output is summarized for this Gmail action");
     expect(result.stdout).toContain("Required top-level fields: max_results");
+  });
+
+  it("summarizes Gmail fetch-emails output by default", async () => {
+    const gateway = createFakeGateway({
+      actionsByToolkit: {
+        gmail: gmailActions,
+      },
+      connections: [{ id: "conn_1", toolkitSlug: "gmail", status: "ACTIVE", userId: "default" }],
+      executeResult: () => ({
+        successful: true,
+        data: {
+          resultSizeEstimate: 42,
+          nextPageToken: "next_page_1",
+          messages: [
+            {
+              messageId: "msg_1",
+              sender: "Alice <alice@example.com>",
+              subject: "Quarterly update",
+              messageTimestamp: "2026-03-21T09:15:00Z",
+              labelIds: ["INBOX", "IMPORTANT"],
+              preview: {
+                body: "Hello team, here is the quarterly update with a long body that should be truncated once it reaches the preview limit for the default CLI output.",
+              },
+              messageText: "full body should not be dumped in text mode",
+            },
+          ],
+        },
+        logId: "log_123",
+      }),
+    });
+
+    const result = await runCli(
+      ["gmail", "fetch-emails", "--api-key", "test-key", "--max-results", "1"],
+      {
+        gatewayFactory: gateway.factory,
+        stdoutIsTTY: false,
+      }
+    );
+
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toContain("Gmail / fetch-emails");
+    expect(result.stdout).toContain("Summary: 1 message");
+    expect(result.stdout).toContain("msg_1");
+    expect(result.stdout).toContain("From: Alice <alice@example.com>");
+    expect(result.stdout).toContain("Subject: Quarterly update");
+    expect(result.stdout).toContain("Labels: INBOX, IMPORTANT");
+    expect(result.stdout).toContain("Use --json for the full response.");
+    expect(result.stdout).toContain("fetch-message-by-message-id --message-id msg_1");
+    expect(result.stdout).not.toContain("\"messageText\"");
+    expect(result.stdout).not.toContain("full body should not be dumped");
+  });
+
+  it("renders concise empty Gmail summaries", async () => {
+    const gateway = createFakeGateway({
+      actionsByToolkit: {
+        gmail: gmailActions,
+      },
+      connections: [{ id: "conn_1", toolkitSlug: "gmail", status: "ACTIVE", userId: "default" }],
+      executeResult: () => ({
+        successful: true,
+        data: {
+          messages: [],
+        },
+        logId: "log_123",
+      }),
+    });
+
+    const result = await runCli(
+      ["gmail", "fetch-emails", "--api-key", "test-key", "--max-results", "1"],
+      {
+        gatewayFactory: gateway.factory,
+        stdoutIsTTY: false,
+      }
+    );
+
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toContain("No messages found.");
+    expect(result.stdout).toContain("Use --json for the full response.");
+    expect(result.stdout).not.toContain("Data:");
   });
 
   it("executes an action and merges JSON, flags, booleans, and --set", async () => {
@@ -206,6 +286,13 @@ describe("runCli", () => {
 function createFakeGateway(options: {
   actionsByToolkit: Record<string, ToolkitAction[]>;
   connections?: Array<{ id: string; toolkitSlug: string; status?: string; userId?: string }>;
+  executeResult?: (action: ToolkitAction) => {
+    successful: boolean;
+    data: unknown;
+    error?: string | null | undefined;
+    logId?: string | undefined;
+    version?: string | undefined;
+  };
 }): {
   executions: Array<{
     action: ToolkitAction;
@@ -243,15 +330,18 @@ function createFakeGateway(options: {
       }),
     executeAction: async (action, executionOptions) => {
       executions.push({ action, options: executionOptions });
+      const execution = options.executeResult?.(action);
       return {
-        successful: true,
-        data: {
-          echoed: true,
-        },
-        logId: "log_123",
+        successful: execution?.successful ?? true,
+        data:
+          execution?.data ?? {
+            echoed: true,
+          },
+        error: execution?.error,
+        logId: execution?.logId ?? "log_123",
         toolSlug: action.slug,
         toolkitSlug: action.toolkitSlug,
-        version: executionOptions.toolVersion ?? action.version,
+        version: execution?.version ?? executionOptions.toolVersion ?? action.version,
         userId: executionOptions.userId,
         input: executionOptions.input,
       };

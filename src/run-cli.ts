@@ -26,9 +26,8 @@ import { stringifyJson } from "./utils/json.js";
 
 export async function runCli(argv: string[], options: CliRunOptions = {}): Promise<CliRunResult> {
   const env = options.env ?? process.env;
-  const stdoutIsTTY = options.stdoutIsTTY ?? true;
   const shared = parseSharedFlags(argv);
-  const machineOutput = shared.json || !stdoutIsTTY;
+  const machineOutput = shared.json;
   const remaining = shared.remainingTokens;
   const gatewayOrError = createGatewayFactory(shared.apiKey ?? env[API_KEY_ENV], shared.baseUrl, options);
 
