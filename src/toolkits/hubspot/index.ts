@@ -7,7 +7,33 @@ export const hubspotToolkit = defineToolkit({
   displayName: "HubSpot",
   summary: "contacts, deals, pipelines",
   capabilities: ["contacts", "deals", "pipelines"],
-  examples: ["list-contacts", "list-deals", "get-pipelines"],
+  examples: ["list-contacts", "search-contacts-by-criteria", "create-deal"],
   readCheckActions: ["list-contacts", "list-deals"],
+  featuredActions: [
+    {
+      canonical: "list-contacts",
+      priority: 100,
+      shortHelp: "Browse contacts in the CRM.",
+    },
+    {
+      canonical: "search-contacts-by-criteria",
+      priority: 90,
+      shortHelp: "Find contacts by filters or query.",
+    },
+    {
+      canonical: "list-deals",
+      priority: 80,
+      shortHelp: "List deals in the pipeline.",
+    },
+    {
+      canonical: "create-contact",
+      priority: 70,
+      shortHelp: "Create a new contact record.",
+    },
+    {
+      canonical: "create-deal",
+      priority: 60,
+      shortHelp: "Create a new deal.",
+    },
+  ],
 });
-

@@ -279,8 +279,8 @@ describe("runCli", () => {
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toContain("Recommended first actions:");
     expect(result.stdout).toContain("fetch-emails: Read recent inbox messages with compact summaries.");
-    expect(result.stdout).toContain("search-emails: Search Gmail by query before reading full messages.");
     expect(result.stdout).toContain("create-email-draft: Prepare an email draft without sending it yet.");
+    expect(result.stdout).toContain("send-email: Send an email when the content is ready.");
     expect(result.stdout).toContain("Other discovered actions");
     expect(result.stdout).toContain("list-labels");
     expect(result.stdout.indexOf("Recommended first actions:")).toBeLessThan(

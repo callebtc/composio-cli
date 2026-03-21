@@ -8,8 +8,34 @@ export const composioSearchToolkit = defineToolkit({
   displayName: "Composio Search",
   summary: "web, news, scholar, maps, trends, fetch URL",
   capabilities: ["web", "news", "scholar", "maps", "trends", "fetch URL"],
-  examples: ["web-search", "news-search", "fetch-url"],
+  examples: ["web", "news", "fetch-url-content"],
   readCheckActions: ["web-search", "fetch-url"],
   aliases: ["composiosearch", "composio_search", "search"],
+  featuredActions: [
+    {
+      canonical: "web",
+      priority: 100,
+      shortHelp: "Search the web for broad research tasks.",
+    },
+    {
+      canonical: "news",
+      priority: 90,
+      shortHelp: "Search recent news articles.",
+    },
+    {
+      canonical: "fetch-url-content",
+      priority: 80,
+      shortHelp: "Fetch clean readable content from a URL.",
+    },
+    {
+      canonical: "scholar",
+      priority: 70,
+      shortHelp: "Search academic papers and citations.",
+    },
+    {
+      canonical: "google-maps",
+      priority: 60,
+      shortHelp: "Search places and local business results.",
+    },
+  ],
 });
-

@@ -7,7 +7,33 @@ export const jiraToolkit = defineToolkit({
   displayName: "Jira",
   summary: "create issues, sprints, boards",
   capabilities: ["issues", "sprints", "boards"],
-  examples: ["list-boards", "list-sprints", "create-issue"],
+  examples: ["search-issues", "create-issue", "list-boards"],
   readCheckActions: ["list-boards", "list-sprints"],
+  featuredActions: [
+    {
+      canonical: "search-issues",
+      priority: 100,
+      shortHelp: "Search issues with JQL or simple filters.",
+    },
+    {
+      canonical: "get-issue",
+      priority: 90,
+      shortHelp: "Read one issue by key or ID.",
+    },
+    {
+      canonical: "create-issue",
+      priority: 80,
+      shortHelp: "Create a new Jira issue.",
+    },
+    {
+      canonical: "transition-issue",
+      priority: 70,
+      shortHelp: "Move an issue to a new workflow state.",
+    },
+    {
+      canonical: "list-boards",
+      priority: 60,
+      shortHelp: "List boards before inspecting sprints.",
+    },
+  ],
 });
-

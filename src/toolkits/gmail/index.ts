@@ -8,7 +8,7 @@ export const gmailToolkit = defineToolkit({
   displayName: "Gmail",
   summary: "send, fetch, draft, search, labels, threads, attachments",
   capabilities: ["send", "fetch", "draft", "search", "labels", "threads", "attachments"],
-  examples: ["fetch-emails", "search-emails", "create-email-draft"],
+  examples: ["fetch-emails", "create-email-draft", "send-email"],
   readCheckActions: ["list-labels", "fetch-emails", "list-threads"],
   featuredActions: [
     {
@@ -17,9 +17,9 @@ export const gmailToolkit = defineToolkit({
       shortHelp: "Read recent inbox messages with compact summaries.",
     },
     {
-      canonical: "search-emails",
+      canonical: "fetch-message-by-message-id",
       priority: 90,
-      shortHelp: "Search Gmail by query before reading full messages.",
+      shortHelp: "Read one full message after choosing a message ID.",
     },
     {
       canonical: "create-email-draft",
@@ -32,9 +32,9 @@ export const gmailToolkit = defineToolkit({
       shortHelp: "Send an email when the content is ready.",
     },
     {
-      canonical: "fetch-message-by-message-id",
+      canonical: "reply-to-thread",
       priority: 60,
-      shortHelp: "Read one full message after choosing a message ID.",
+      shortHelp: "Reply inside an existing Gmail thread.",
     },
   ],
   outputSummary: gmailOutputSummary,

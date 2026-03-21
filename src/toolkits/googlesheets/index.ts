@@ -7,8 +7,34 @@ export const googleSheetsToolkit = defineToolkit({
   displayName: "Google Sheets",
   summary: "read, write, append, batch update",
   capabilities: ["read", "write", "append", "batch update"],
-  examples: ["read-sheet", "append-values", "batch-update"],
+  examples: ["values-get", "values-update", "spreadsheets-values-append"],
   readCheckActions: ["read-sheet"],
   aliases: ["googlesheets", "sheets"],
+  featuredActions: [
+    {
+      canonical: "values-get",
+      priority: 100,
+      shortHelp: "Read a range of cells from a sheet.",
+    },
+    {
+      canonical: "values-update",
+      priority: 90,
+      shortHelp: "Write values into a target cell range.",
+    },
+    {
+      canonical: "spreadsheets-values-append",
+      priority: 80,
+      shortHelp: "Append rows to the end of a sheet.",
+    },
+    {
+      canonical: "batch-update",
+      priority: 70,
+      shortHelp: "Apply multiple sheet mutations in one request.",
+    },
+    {
+      canonical: "get-sheet-names",
+      priority: 60,
+      shortHelp: "See available tabs before reading or writing.",
+    },
+  ],
 });
-
