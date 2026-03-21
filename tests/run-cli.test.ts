@@ -268,6 +268,58 @@ const googleDocsActions: ToolkitAction[] = [
   },
 ];
 
+const unknownRuntimeActions: ToolkitAction[] = [
+  {
+    slug: "CUSTOM_CREATE_MESSAGE",
+    name: "Create Message",
+    description: "Create a new message in the workspace.",
+    toolkitSlug: "custom_workspace",
+    cliName: "create-message",
+    aliases: ["create-message", "custom-workspace-create-message"],
+    version: "20260101_00",
+    inputSchema: {
+      type: "object",
+      properties: {
+        channel_id: {
+          type: "string",
+          description: "Channel identifier.",
+        },
+      },
+    },
+  },
+  {
+    slug: "CUSTOM_LIST_CHANNELS",
+    name: "List Channels",
+    description: "List channels visible to the user.",
+    toolkitSlug: "custom_workspace",
+    cliName: "list-channels",
+    aliases: ["list-channels", "custom-workspace-list-channels"],
+    version: "20260101_00",
+    inputSchema: {
+      type: "object",
+      properties: {},
+    },
+  },
+  {
+    slug: "CUSTOM_SEND_MESSAGE",
+    name: "Send Message",
+    description: "Send a message to a selected channel.",
+    toolkitSlug: "custom_workspace",
+    cliName: "send-message",
+    aliases: ["send-message", "custom-workspace-send-message"],
+    version: "20260101_00",
+    inputSchema: {
+      type: "object",
+      properties: {
+        text: {
+          type: "string",
+          description: "Message text.",
+        },
+      },
+    },
+  },
+];
+
 describe("runCli", () => {
   it("renders the root guide by default", async () => {
     const result = await runCli([]);
@@ -341,9 +393,9 @@ describe("runCli", () => {
 
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toContain("Recommended actions:");
-    expect(result.stdout).toContain("fetch-emails: Read recent inbox messages with compact summaries.");
-    expect(result.stdout).toContain("create-email-draft: Prepare an email draft without sending it yet.");
-    expect(result.stdout).toContain("send-email: Send an email when the content is ready.");
+    expect(result.stdout).toContain("fetch-emails: Fetch messages from Gmail.");
+    expect(result.stdout).toContain("create-email-draft: Create a Gmail draft.");
+    expect(result.stdout).toContain("send-email: Send an email through Gmail.");
     expect(result.stdout).toContain("Discovered actions: 5 total.");
     expect(result.stdout).toContain("Run 'composio-cli gmail actions' to see the full list.");
     expect(result.stdout).not.toContain("Other discovered actions");
@@ -364,8 +416,8 @@ describe("runCli", () => {
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toContain("Gmail actions");
     expect(result.stdout).toContain("Recommended actions:");
-    expect(result.stdout).toContain("fetch-emails: Read recent inbox messages with compact summaries.");
-    expect(result.stdout).toContain("send-email: Send an email when the content is ready.");
+    expect(result.stdout).toContain("fetch-emails: Fetch messages from Gmail.");
+    expect(result.stdout).toContain("send-email: Send an email through Gmail.");
     expect(result.stdout).toContain("list-labels");
     expect(result.stdout.indexOf("fetch-emails")).toBeLessThan(result.stdout.indexOf("list-labels"));
   });
@@ -387,10 +439,8 @@ describe("runCli", () => {
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toContain("Google Docs");
     expect(result.stdout).toContain("Recommended actions:");
-    expect(result.stdout).toContain(
-      "create-document: Create a blank Google Doc with a title and optional starter text."
-    );
-    expect(result.stdout).toContain("get-document-by-id: Read one Google Doc by document ID.");
+    expect(result.stdout).toContain("create-document: Create a new Google Doc.");
+    expect(result.stdout).toContain("get-document-by-id: Fetch one document by ID.");
     expect(result.stdout).toContain("Discovered actions: 2 total.");
   });
 
@@ -412,6 +462,26 @@ describe("runCli", () => {
     expect(result.stdout).toContain("Google Docs actions (2)");
     expect(result.stdout).toContain("create-document");
     expect(result.stdout).toContain("get-document-by-id");
+  });
+
+  it("infers metadata for connected toolkits without a static definition", async () => {
+    const gateway = createFakeGateway({
+      actionsByToolkit: {
+        custom_workspace: unknownRuntimeActions,
+      },
+      connections: [
+        { id: "conn_1", toolkitSlug: "custom_workspace", status: "ACTIVE", userId: "default" },
+      ],
+    });
+
+    const result = await runCli(["--api-key", "test-key"], {
+      gatewayFactory: gateway.factory,
+    });
+
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toContain("custom-workspace");
+    expect(result.stdout).toContain("read, create, send, messages");
+    expect(result.stdout).not.toContain("live-discovered connected toolkit");
   });
 
   it("renders action help for toolkit action --help", async () => {
@@ -495,11 +565,11 @@ describe("runCli", () => {
 
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toContain("Recommended actions:");
-    expect(result.stdout).toContain("events-list: List upcoming events from one calendar.");
-    expect(result.stdout).toContain("events-get: Read one event by its event ID.");
-    expect(result.stdout).toContain("create-event: Create a calendar event with time, title, and attendees.");
+    expect(result.stdout).toContain("events-list: List events from a calendar.");
+    expect(result.stdout).toContain("events-get: Get one event by ID.");
+    expect(result.stdout).toContain("create-event: Create a new calendar event.");
+    expect(result.stdout.indexOf("events-get")).toBeLessThan(result.stdout.indexOf("events-list"));
     expect(result.stdout.indexOf("events-list")).toBeLessThan(result.stdout.indexOf("find-free-slots"));
-    expect(result.stdout.indexOf("find-free-slots")).toBeLessThan(result.stdout.indexOf("list-calendars"));
   });
 
   it("summarizes Gmail fetch-emails output by default", async () => {

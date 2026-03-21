@@ -19,7 +19,7 @@ import {
 } from "./help.js";
 import { buildActionInput, parseSharedFlags, validateSharedFlags } from "./input.js";
 import { resolveToolkitActionSelection } from "./toolkits/actions.js";
-import { buildRuntimeToolkit, resolveToolkit } from "./toolkits/index.js";
+import { buildRuntimeToolkit, getSupportedToolkitByApiSlug, resolveToolkit } from "./toolkits/index.js";
 import { hasSummaryDefault } from "./toolkits/output.js";
 import type { ToolkitDefinition } from "./toolkits/shared.js";
 import type { CliRunOptions, CliRunResult, ComposioGateway } from "./types.js";
@@ -131,9 +131,22 @@ export async function runCli(argv: string[], options: CliRunOptions = {}): Promi
     }
     const accounts = await getConnectedAccounts("user");
     const activeToolkits = [...new Set(accounts.map(account => account.toolkitSlug).filter(Boolean))];
-    enabledToolkitCache = activeToolkits
-      .map(toolkitSlug => buildRuntimeToolkit(toolkitSlug))
-      .sort((left, right) => left.cliName.localeCompare(right.cliName));
+    enabledToolkitCache = (
+      await Promise.all(
+        activeToolkits.map(async toolkitSlug => {
+          try {
+            const actions = await gatewayOrError.gateway!.listToolkitActions(
+              toolkitSlug,
+              (getSupportedToolkitByApiSlug(toolkitSlug)?.toolPrefix ??
+                toolkitSlug.replace(/-/g, "_").toUpperCase())
+            );
+            return buildRuntimeToolkit(toolkitSlug, actions);
+          } catch {
+            return buildRuntimeToolkit(toolkitSlug);
+          }
+        })
+      )
+    ).sort((left, right) => left.cliName.localeCompare(right.cliName));
     return enabledToolkitCache;
   };
 
@@ -203,9 +216,9 @@ export async function runCli(argv: string[], options: CliRunOptions = {}): Promi
     }
   }
 
-  const toolkit = resolveToolkit(command) ?? resolveToolkit(command, await getEnabledToolkits().catch(() => []));
+  const enabledToolkits = await getEnabledToolkits().catch(() => []);
+  const toolkit = resolveToolkit(command, enabledToolkits) ?? resolveToolkit(command);
   if (!toolkit) {
-    const enabledToolkits = await getEnabledToolkits().catch(() => []);
     const toolkitSuggestion = chooseClosestIdentifier(
       command,
       enabledToolkits.map(entry => entry.cliName)
@@ -225,7 +238,6 @@ export async function runCli(argv: string[], options: CliRunOptions = {}): Promi
     });
   }
 
-  const enabledToolkits = await getEnabledToolkits();
   const toolkitEnabled = enabledToolkits.some(entry => entry.apiSlug === toolkit.apiSlug);
   if (!toolkitEnabled) {
     return failWithError(
