@@ -6,7 +6,7 @@ import type {
   JsonSchemaProperty,
   ToolkitAction,
 } from "./types.js";
-import { hasSummaryDefault, renderSummarizedExecutionResult } from "./summaries.js";
+import { hasSummaryDefault, renderSummarizedExecutionResult } from "./toolkits/output.js";
 import type { ToolkitDefinition } from "./toolkits/shared.js";
 import { indent, pluralize, titleCaseWords, toFlagName, truncate } from "./utils/strings.js";
 
@@ -148,7 +148,7 @@ export function renderActionGuide(toolkit: ToolkitDefinition, action: ToolkitAct
     ...propertyLines,
     "",
     hasSummaryDefault(toolkit, action)
-      ? "Default text output is summarized for this Gmail action. Use --json for the full response."
+      ? `Default text output is summarized for this ${toolkit.displayName} action. Use --json for the full response.`
       : undefined,
     hasSummaryDefault(toolkit, action) ? "" : undefined,
     required.length > 0

@@ -1,7 +1,7 @@
-import { CLI_NAME } from "./constants.js";
-import type { ExecuteActionResult, ToolkitAction } from "./types.js";
-import type { ToolkitDefinition } from "./toolkits/shared.js";
-import { truncate } from "./utils/strings.js";
+import { CLI_NAME } from "../../constants.js";
+import type { ToolkitAction } from "../../types.js";
+import type { ToolkitOutputSummary, ToolkitSummaryRenderInput } from "../shared.js";
+import { truncate } from "../../utils/strings.js";
 
 const GMAIL_SUMMARY_ACTIONS = new Set([
   "GMAIL_FETCH_EMAILS",
@@ -14,55 +14,42 @@ const GMAIL_SUMMARY_ACTIONS = new Set([
   "GMAIL_SEARCH_PEOPLE",
 ]);
 
-export function hasSummaryDefault(toolkit: ToolkitDefinition, action: ToolkitAction): boolean {
-  return toolkit.apiSlug === "gmail" && GMAIL_SUMMARY_ACTIONS.has(action.slug);
-}
-
-export function renderSummarizedExecutionResult(result: {
-  action: ToolkitAction;
-  toolkit: ToolkitDefinition;
-  execution: ExecuteActionResult;
-}): string | undefined {
-  if (!result.execution.successful) {
-    return undefined;
-  }
-  if (result.toolkit.apiSlug !== "gmail") {
-    return undefined;
-  }
-  if (!GMAIL_SUMMARY_ACTIONS.has(result.action.slug)) {
-    return undefined;
-  }
-
-  const data = asRecord(result.execution.data);
-  if (!data) {
-    return undefined;
-  }
-
-  switch (result.action.slug) {
-    case "GMAIL_FETCH_EMAILS":
-    case "GMAIL_FETCH_MESSAGE_BY_THREAD_ID":
-      return renderGmailMessagesSummary(result, data);
-    case "GMAIL_LIST_THREADS":
-      return renderGmailThreadsSummary(result, data);
-    case "GMAIL_LIST_DRAFTS":
-      return renderGmailDraftsSummary(result, data);
-    case "GMAIL_LIST_LABELS":
-      return renderGmailLabelsSummary(result, data);
-    case "GMAIL_GET_CONTACTS":
-    case "GMAIL_GET_PEOPLE":
-    case "GMAIL_SEARCH_PEOPLE":
-      return renderGmailPeopleSummary(result, data);
-    default:
+export const gmailOutputSummary: ToolkitOutputSummary = {
+  hasSummaryDefault(action: ToolkitAction): boolean {
+    return GMAIL_SUMMARY_ACTIONS.has(action.slug);
+  },
+  renderExecutionResult(result: ToolkitSummaryRenderInput): string | undefined {
+    if (!result.execution.successful || !GMAIL_SUMMARY_ACTIONS.has(result.action.slug)) {
       return undefined;
-  }
-}
+    }
+
+    const data = asRecord(result.execution.data);
+    if (!data) {
+      return undefined;
+    }
+
+    switch (result.action.slug) {
+      case "GMAIL_FETCH_EMAILS":
+      case "GMAIL_FETCH_MESSAGE_BY_THREAD_ID":
+        return renderGmailMessagesSummary(result, data);
+      case "GMAIL_LIST_THREADS":
+        return renderGmailThreadsSummary(result, data);
+      case "GMAIL_LIST_DRAFTS":
+        return renderGmailDraftsSummary(result, data);
+      case "GMAIL_LIST_LABELS":
+        return renderGmailLabelsSummary(result, data);
+      case "GMAIL_GET_CONTACTS":
+      case "GMAIL_GET_PEOPLE":
+      case "GMAIL_SEARCH_PEOPLE":
+        return renderGmailPeopleSummary(result, data);
+      default:
+        return undefined;
+    }
+  },
+};
 
 function renderGmailMessagesSummary(
-  result: {
-    action: ToolkitAction;
-    toolkit: ToolkitDefinition;
-    execution: ExecuteActionResult;
-  },
+  result: ToolkitSummaryRenderInput,
   data: Record<string, unknown>
 ): string | undefined {
   const messages = pickRecordArray(data, "messages", "results", "items");
@@ -127,11 +114,7 @@ function renderGmailMessagesSummary(
 }
 
 function renderGmailThreadsSummary(
-  result: {
-    action: ToolkitAction;
-    toolkit: ToolkitDefinition;
-    execution: ExecuteActionResult;
-  },
+  result: ToolkitSummaryRenderInput,
   data: Record<string, unknown>
 ): string | undefined {
   const threads = pickRecordArray(data, "threads", "results", "items");
@@ -180,11 +163,7 @@ function renderGmailThreadsSummary(
 }
 
 function renderGmailDraftsSummary(
-  result: {
-    action: ToolkitAction;
-    toolkit: ToolkitDefinition;
-    execution: ExecuteActionResult;
-  },
+  result: ToolkitSummaryRenderInput,
   data: Record<string, unknown>
 ): string | undefined {
   const drafts = pickRecordArray(data, "drafts", "results", "items");
@@ -229,11 +208,7 @@ function renderGmailDraftsSummary(
 }
 
 function renderGmailLabelsSummary(
-  result: {
-    action: ToolkitAction;
-    toolkit: ToolkitDefinition;
-    execution: ExecuteActionResult;
-  },
+  result: ToolkitSummaryRenderInput,
   data: Record<string, unknown>
 ): string | undefined {
   const labels = pickRecordArray(data, "labels", "results", "items");
@@ -265,16 +240,10 @@ function renderGmailLabelsSummary(
 }
 
 function renderGmailPeopleSummary(
-  result: {
-    action: ToolkitAction;
-    toolkit: ToolkitDefinition;
-    execution: ExecuteActionResult;
-  },
+  result: ToolkitSummaryRenderInput,
   data: Record<string, unknown>
 ): string | undefined {
-  const people =
-    pickRecordArray(data, "people", "contacts", "results", "items") ??
-    undefined;
+  const people = pickRecordArray(data, "people", "contacts", "results", "items") ?? undefined;
   if (!people) {
     return undefined;
   }
@@ -309,13 +278,7 @@ function renderGmailPeopleSummary(
   return lines.join("\n");
 }
 
-function renderEmptySummary(
-  result: {
-    action: ToolkitAction;
-    toolkit: ToolkitDefinition;
-  },
-  message: string
-): string {
+function renderEmptySummary(result: ToolkitSummaryRenderInput, message: string): string {
   return [
     `${result.toolkit.displayName} / ${result.action.cliName}`,
     message,
@@ -388,9 +351,9 @@ function asRecord(value: unknown): Record<string, unknown> | undefined {
 
 function asRecordArray(value: unknown): Array<Record<string, unknown>> | undefined {
   return Array.isArray(value)
-    ? value.filter(item => typeof item === "object" && item !== null && !Array.isArray(item)) as Array<
-        Record<string, unknown>
-      >
+    ? (value.filter(
+        item => typeof item === "object" && item !== null && !Array.isArray(item)
+      ) as Array<Record<string, unknown>>)
     : undefined;
 }
 

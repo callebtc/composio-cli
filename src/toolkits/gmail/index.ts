@@ -1,4 +1,5 @@
 import { defineToolkit } from "../shared.js";
+import { gmailOutputSummary } from "./summary.js";
 
 export const gmailToolkit = defineToolkit({
   directoryName: "gmail",
@@ -9,5 +10,5 @@ export const gmailToolkit = defineToolkit({
   capabilities: ["send", "fetch", "draft", "search", "labels", "threads", "attachments"],
   examples: ["fetch-emails", "list-labels", "list-threads"],
   readCheckActions: ["list-labels", "fetch-emails", "list-threads"],
+  outputSummary: gmailOutputSummary,
 });
-

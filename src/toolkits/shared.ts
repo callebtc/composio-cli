@@ -1,4 +1,16 @@
+import type { ExecuteActionResult, ToolkitAction } from "../types.js";
 import { unique } from "../utils/strings.js";
+
+export interface ToolkitSummaryRenderInput {
+  action: ToolkitAction;
+  toolkit: ToolkitDefinition;
+  execution: ExecuteActionResult;
+}
+
+export interface ToolkitOutputSummary {
+  hasSummaryDefault(action: ToolkitAction): boolean;
+  renderExecutionResult(result: ToolkitSummaryRenderInput): string | undefined;
+}
 
 export interface ToolkitDefinition {
   directoryName: string;
@@ -11,12 +23,14 @@ export interface ToolkitDefinition {
   examples: string[];
   readCheckActions: string[];
   aliases: string[];
+  outputSummary?: ToolkitOutputSummary | undefined;
 }
 
 export function defineToolkit(
   definition: Omit<ToolkitDefinition, "aliases" | "toolPrefix"> & {
     aliases?: string[];
     toolPrefix?: string;
+    outputSummary?: ToolkitOutputSummary;
   }
 ): ToolkitDefinition {
   return {
@@ -30,4 +44,3 @@ export function defineToolkit(
     ]),
   };
 }
-
