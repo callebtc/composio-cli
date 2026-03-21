@@ -229,6 +229,45 @@ const googleCalendarActions: ToolkitAction[] = [
   },
 ];
 
+const googleDocsActions: ToolkitAction[] = [
+  {
+    slug: "GOOGLEDOCS_CREATE_DOCUMENT",
+    name: "Create Document",
+    description: "Create a new Google Doc.",
+    toolkitSlug: "googledocs",
+    cliName: "create-document",
+    aliases: ["create-document", "googledocs-create-document"],
+    version: "20260101_00",
+    inputSchema: {
+      type: "object",
+      properties: {
+        title: {
+          type: "string",
+          description: "Document title.",
+        },
+      },
+    },
+  },
+  {
+    slug: "GOOGLEDOCS_GET_DOCUMENT_BY_ID",
+    name: "Get Document By Id",
+    description: "Fetch one document by ID.",
+    toolkitSlug: "googledocs",
+    cliName: "get-document-by-id",
+    aliases: ["get-document-by-id", "googledocs-get-document-by-id"],
+    version: "20260101_00",
+    inputSchema: {
+      type: "object",
+      properties: {
+        document_id: {
+          type: "string",
+          description: "Document identifier.",
+        },
+      },
+    },
+  },
+];
+
 describe("runCli", () => {
   it("renders the root guide by default", async () => {
     const result = await runCli([]);
@@ -255,6 +294,30 @@ describe("runCli", () => {
     expect(result.stdout).toContain("Enabled toolkits for user 'default'");
     expect(result.stdout).toContain("gmail");
     expect(result.stdout).not.toContain("github");
+  });
+
+  it("shows enabled connected toolkits even when they are not in the static registry", async () => {
+    const gateway = createFakeGateway({
+      actionsByToolkit: {
+        gmail: gmailActions,
+      },
+      connections: [
+        { id: "conn_1", toolkitSlug: "gmail", status: "ACTIVE", userId: "default" },
+        { id: "conn_2", toolkitSlug: "googledocs", status: "ACTIVE", userId: "default" },
+        { id: "conn_3", toolkitSlug: "google_maps", status: "ACTIVE", userId: "default" },
+      ],
+    });
+
+    const result = await runCli(["--api-key", "test-key"], {
+      gatewayFactory: gateway.factory,
+    });
+
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toContain("gmail");
+    expect(result.stdout).toContain("google-docs");
+    expect(result.stdout).toContain("google-maps");
+    expect(result.stdout).toContain("create, read, update, search, export documents");
+    expect(result.stdout).toContain("search places, geocode, routes, directions, place details");
   });
 
   it("requires an API key before exposing toolkit help", async () => {
@@ -305,6 +368,50 @@ describe("runCli", () => {
     expect(result.stdout).toContain("send-email: Send an email when the content is ready.");
     expect(result.stdout).toContain("list-labels");
     expect(result.stdout.indexOf("fetch-emails")).toBeLessThan(result.stdout.indexOf("list-labels"));
+  });
+
+  it("renders curated toolkit help for google-docs", async () => {
+    const gateway = createFakeGateway({
+      actionsByToolkit: {
+        googledocs: googleDocsActions,
+      },
+      connections: [
+        { id: "conn_1", toolkitSlug: "googledocs", status: "ACTIVE", userId: "default" },
+      ],
+    });
+
+    const result = await runCli(["google-docs", "--api-key", "test-key"], {
+      gatewayFactory: gateway.factory,
+    });
+
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toContain("Google Docs");
+    expect(result.stdout).toContain("Recommended actions:");
+    expect(result.stdout).toContain(
+      "create-document: Create a blank Google Doc with a title and optional starter text."
+    );
+    expect(result.stdout).toContain("get-document-by-id: Read one Google Doc by document ID.");
+    expect(result.stdout).toContain("Discovered actions: 2 total.");
+  });
+
+  it("accepts the raw connected toolkit slug as an alias for generic runtime toolkits", async () => {
+    const gateway = createFakeGateway({
+      actionsByToolkit: {
+        googledocs: googleDocsActions,
+      },
+      connections: [
+        { id: "conn_1", toolkitSlug: "googledocs", status: "ACTIVE", userId: "default" },
+      ],
+    });
+
+    const result = await runCli(["googledocs", "actions", "--api-key", "test-key"], {
+      gatewayFactory: gateway.factory,
+    });
+
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toContain("Google Docs actions (2)");
+    expect(result.stdout).toContain("create-document");
+    expect(result.stdout).toContain("get-document-by-id");
   });
 
   it("renders action help for toolkit action --help", async () => {

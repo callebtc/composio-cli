@@ -1,8 +1,11 @@
 import type { ToolkitDefinition } from "./shared.js";
-import { normalizeToken } from "../utils/strings.js";
+import { defineToolkit } from "./shared.js";
+import { normalizeToken, titleCaseWords, toKebabCase } from "../utils/strings.js";
 import { gmailToolkit } from "./gmail/index.js";
 import { googleCalendarToolkit } from "./googlecalendar/index.js";
+import { googleDocsToolkit } from "./googledocs/index.js";
 import { googleDriveToolkit } from "./googledrive/index.js";
+import { googleMapsToolkit } from "./googlemaps/index.js";
 import { googleSheetsToolkit } from "./googlesheets/index.js";
 import { slackToolkit } from "./slack/index.js";
 import { githubToolkit } from "./github/index.js";
@@ -29,7 +32,9 @@ import { composioSearchToolkit } from "./composiosearch/index.js";
 export const SUPPORTED_TOOLKITS: ToolkitDefinition[] = [
   gmailToolkit,
   googleCalendarToolkit,
+  googleDocsToolkit,
   googleDriveToolkit,
+  googleMapsToolkit,
   googleSheetsToolkit,
   slackToolkit,
   githubToolkit,
@@ -54,10 +59,41 @@ export const SUPPORTED_TOOLKITS: ToolkitDefinition[] = [
   composioSearchToolkit,
 ];
 
-export function resolveToolkit(token: string): ToolkitDefinition | undefined {
+export function resolveToolkit(
+  token: string,
+  toolkits: ToolkitDefinition[] = SUPPORTED_TOOLKITS
+): ToolkitDefinition | undefined {
   const normalized = normalizeToken(token);
-  return SUPPORTED_TOOLKITS.find(toolkit =>
+  return toolkits.find(toolkit =>
     toolkit.aliases.some(alias => normalizeToken(alias) === normalized)
   );
 }
 
+export function getSupportedToolkitByApiSlug(apiSlug: string): ToolkitDefinition | undefined {
+  return SUPPORTED_TOOLKITS.find(toolkit => toolkit.apiSlug === apiSlug);
+}
+
+export function buildRuntimeToolkit(apiSlug: string): ToolkitDefinition {
+  return (
+    getSupportedToolkitByApiSlug(apiSlug) ??
+    defineToolkit({
+      directoryName: normalizeToken(apiSlug).replace(/-/g, ""),
+      cliName: toKebabCase(formatRuntimeToolkitDisplayName(apiSlug)),
+      apiSlug,
+      displayName: formatRuntimeToolkitDisplayName(apiSlug),
+      summary: "live-discovered connected toolkit",
+      capabilities: ["live-discovered actions"],
+      examples: [],
+      readCheckActions: [],
+    })
+  );
+}
+
+function formatRuntimeToolkitDisplayName(apiSlug: string): string {
+  const spaced = apiSlug
+    .replace(/^google(?=[a-z])/, "google ")
+    .replace(/^composio(?=[a-z])/, "composio ")
+    .replace(/^discord(?=bot)/, "discord ")
+    .replace(/[_-]+/g, " ");
+  return titleCaseWords(spaced);
+}

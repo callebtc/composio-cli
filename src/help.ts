@@ -69,8 +69,9 @@ export function renderToolkitList(toolkits: ToolkitDefinition[], userId: string)
   const lines = [
     `${pluralize(toolkits.length, "enabled toolkit")} for user '${userId}':`,
     ...toolkits.map(toolkit => {
-      const capabilities = toolkit.capabilities.join(", ");
-      return `  ${toolkit.cliName.padEnd(20)}${toolkit.displayName} — ${capabilities}`;
+      const descriptor =
+        toolkit.capabilities.length > 0 ? toolkit.capabilities.join(", ") : toolkit.summary;
+      return `  ${toolkit.cliName.padEnd(20)}${toolkit.displayName} — ${descriptor}`;
     }),
     "",
   ];
@@ -102,11 +103,26 @@ export function renderToolkitGuide(toolkit: ToolkitDefinition, actions?: Toolkit
       lines.push(`  ${formatFeaturedAction(entry.action.cliName, entry.feature.shortHelp)}`);
     });
     lines.push(`  Inspect one: ${CLI_NAME} ${toolkit.cliName} inspect ${featuredActions[0]!.action.cliName}`);
+  } else if (actions && actions.length > 0) {
+    lines.push("Recommended actions:");
+    actions.slice(0, TOOLKIT_PREVIEW_LIMIT).forEach(action => {
+      lines.push(
+        `  ${formatFeaturedAction(
+          action.cliName,
+          truncate(action.description ?? action.name, 70)
+        )}`
+      );
+    });
+    lines.push(`  Inspect one: ${CLI_NAME} ${toolkit.cliName} inspect ${actions[0]!.cliName}`);
   } else {
     lines.push("Recommended actions:");
-    toolkit.examples.forEach(example => {
-      lines.push(`  ${CLI_NAME} ${toolkit.cliName} inspect ${example}`);
-    });
+    if (toolkit.examples.length > 0) {
+      toolkit.examples.forEach(example => {
+        lines.push(`  ${CLI_NAME} ${toolkit.cliName} inspect ${example}`);
+      });
+    } else {
+      lines.push(`  ${CLI_NAME} ${toolkit.cliName} actions`);
+    }
   }
 
   if (actions && actions.length > 0) {

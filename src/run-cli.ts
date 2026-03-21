@@ -19,7 +19,7 @@ import {
 } from "./help.js";
 import { buildActionInput, parseSharedFlags, validateSharedFlags } from "./input.js";
 import { resolveToolkitActionSelection } from "./toolkits/actions.js";
-import { resolveToolkit, SUPPORTED_TOOLKITS } from "./toolkits/index.js";
+import { buildRuntimeToolkit, resolveToolkit } from "./toolkits/index.js";
 import { hasSummaryDefault } from "./toolkits/output.js";
 import type { ToolkitDefinition } from "./toolkits/shared.js";
 import type { CliRunOptions, CliRunResult, ComposioGateway } from "./types.js";
@@ -87,7 +87,6 @@ export async function runCli(argv: string[], options: CliRunOptions = {}): Promi
       return effectiveUserIdCache;
     }
     const accounts = await gatewayOrError.gateway!.listConnectedAccounts({
-      toolkitSlugs: SUPPORTED_TOOLKITS.map(entry => entry.apiSlug),
       statuses: ["ACTIVE"],
     });
     allConnectedAccountCache = accounts.filter(account => !account.isDisabled);
@@ -108,7 +107,6 @@ export async function runCli(argv: string[], options: CliRunOptions = {}): Promi
     }
     const effectiveUserId = await getEffectiveUserId();
     const accounts = await gatewayOrError.gateway!.listConnectedAccounts({
-      toolkitSlugs: SUPPORTED_TOOLKITS.map(entry => entry.apiSlug),
       ...(scope === "user" ? { userId: effectiveUserId } : {}),
       statuses: ["ACTIVE"],
     });
@@ -132,8 +130,10 @@ export async function runCli(argv: string[], options: CliRunOptions = {}): Promi
       return enabledToolkitCache;
     }
     const accounts = await getConnectedAccounts("user");
-    const activeToolkits = new Set(accounts.map(account => account.toolkitSlug));
-    enabledToolkitCache = SUPPORTED_TOOLKITS.filter(toolkit => activeToolkits.has(toolkit.apiSlug));
+    const activeToolkits = [...new Set(accounts.map(account => account.toolkitSlug).filter(Boolean))];
+    enabledToolkitCache = activeToolkits
+      .map(toolkitSlug => buildRuntimeToolkit(toolkitSlug))
+      .sort((left, right) => left.cliName.localeCompare(right.cliName));
     return enabledToolkitCache;
   };
 
@@ -203,7 +203,7 @@ export async function runCli(argv: string[], options: CliRunOptions = {}): Promi
     }
   }
 
-  const toolkit = resolveToolkit(command);
+  const toolkit = resolveToolkit(command) ?? resolveToolkit(command, await getEnabledToolkits().catch(() => []));
   if (!toolkit) {
     const enabledToolkits = await getEnabledToolkits().catch(() => []);
     const toolkitSuggestion = chooseClosestIdentifier(
