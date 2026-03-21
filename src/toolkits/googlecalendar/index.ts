@@ -8,8 +8,37 @@ export const googleCalendarToolkit = defineToolkit({
   displayName: "Google Calendar",
   summary: "create/find/patch events, free slots, list calendars",
   capabilities: ["events", "free slots", "calendars"],
-  examples: ["list-calendars", "find-event", "find-free-slots"],
+  examples: ["events-list", "create-event", "find-free-slots"],
   readCheckActions: ["list-calendars", "find-event", "events-list"],
   aliases: ["googlecalendar", "calendar"],
+  featuredActions: [
+    {
+      canonical: "events-list",
+      aliases: ["list-events"],
+      priority: 100,
+      shortHelp: "List upcoming events from one calendar.",
+    },
+    {
+      canonical: "events-get",
+      aliases: ["get-event"],
+      priority: 90,
+      shortHelp: "Read one event by its event ID.",
+    },
+    {
+      canonical: "create-event",
+      priority: 80,
+      shortHelp: "Create a calendar event with time, title, and attendees.",
+    },
+    {
+      canonical: "find-free-slots",
+      priority: 70,
+      shortHelp: "Find open time ranges across calendars.",
+    },
+    {
+      canonical: "list-calendars",
+      priority: 60,
+      shortHelp: "See which calendars are available to query.",
+    },
+  ],
   outputSummary: googleCalendarOutputSummary,
 });

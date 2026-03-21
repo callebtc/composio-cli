@@ -60,6 +60,42 @@ const gmailActions: ToolkitAction[] = [
     },
   },
   {
+    slug: "GMAIL_SEARCH_EMAILS",
+    name: "Search Emails",
+    description: "Search Gmail messages.",
+    toolkitSlug: "gmail",
+    cliName: "search-emails",
+    aliases: ["search-emails", "gmail-search-emails"],
+    version: "20260101_00",
+    inputSchema: {
+      type: "object",
+      properties: {
+        query: {
+          type: "string",
+          description: "Search query.",
+        },
+      },
+    },
+  },
+  {
+    slug: "GMAIL_CREATE_EMAIL_DRAFT",
+    name: "Create Email Draft",
+    description: "Create a Gmail draft.",
+    toolkitSlug: "gmail",
+    cliName: "create-email-draft",
+    aliases: ["create-email-draft", "gmail-create-email-draft"],
+    version: "20260101_00",
+    inputSchema: {
+      type: "object",
+      properties: {
+        recipient: {
+          type: "string",
+          description: "Recipient email address.",
+        },
+      },
+    },
+  },
+  {
     slug: "GMAIL_SEND_EMAIL",
     name: "Send Email",
     description: "Send an email through Gmail.",
@@ -138,6 +174,42 @@ const googleCalendarActions: ToolkitAction[] = [
     },
   },
   {
+    slug: "GOOGLECALENDAR_EVENTS_GET",
+    name: "Events Get",
+    description: "Get one event by ID.",
+    toolkitSlug: "googlecalendar",
+    cliName: "events-get",
+    aliases: ["events-get", "googlecalendar-events-get"],
+    version: "20260101_00",
+    inputSchema: {
+      type: "object",
+      properties: {
+        event_id: {
+          type: "string",
+          description: "Event identifier.",
+        },
+      },
+    },
+  },
+  {
+    slug: "GOOGLECALENDAR_CREATE_EVENT",
+    name: "Create Event",
+    description: "Create a new calendar event.",
+    toolkitSlug: "googlecalendar",
+    cliName: "create-event",
+    aliases: ["create-event", "googlecalendar-create-event"],
+    version: "20260101_00",
+    inputSchema: {
+      type: "object",
+      properties: {
+        calendar_id: {
+          type: "string",
+          description: "Calendar identifier.",
+        },
+      },
+    },
+  },
+  {
     slug: "GOOGLECALENDAR_FIND_FREE_SLOTS",
     name: "Find Free Slots",
     description: "Find free slots for one or more calendars.",
@@ -192,6 +264,30 @@ describe("runCli", () => {
     expect(result.stderr).toContain("Missing Composio API key");
   });
 
+  it("prioritizes featured actions in toolkit help", async () => {
+    const gateway = createFakeGateway({
+      actionsByToolkit: {
+        gmail: gmailActions,
+      },
+      connections: [{ id: "conn_1", toolkitSlug: "gmail", status: "ACTIVE", userId: "default" }],
+    });
+
+    const result = await runCli(["gmail", "--api-key", "test-key"], {
+      gatewayFactory: gateway.factory,
+    });
+
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toContain("Recommended first actions:");
+    expect(result.stdout).toContain("fetch-emails: Read recent inbox messages with compact summaries.");
+    expect(result.stdout).toContain("search-emails: Search Gmail by query before reading full messages.");
+    expect(result.stdout).toContain("create-email-draft: Prepare an email draft without sending it yet.");
+    expect(result.stdout).toContain("Other discovered actions");
+    expect(result.stdout).toContain("list-labels");
+    expect(result.stdout.indexOf("Recommended first actions:")).toBeLessThan(
+      result.stdout.indexOf("Other discovered actions")
+    );
+  });
+
   it("lists actions from the gateway", async () => {
     const gateway = createFakeGateway({
       actionsByToolkit: {
@@ -206,8 +302,11 @@ describe("runCli", () => {
 
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toContain("Gmail actions");
-    expect(result.stdout).toContain("fetch-emails");
+    expect(result.stdout).toContain("Recommended first actions:");
+    expect(result.stdout).toContain("fetch-emails: Read recent inbox messages with compact summaries.");
+    expect(result.stdout).toContain("send-email: Send an email when the content is ready.");
     expect(result.stdout).toContain("list-labels");
+    expect(result.stdout.indexOf("fetch-emails")).toBeLessThan(result.stdout.indexOf("list-labels"));
   });
 
   it("renders action help for toolkit action --help", async () => {
@@ -273,6 +372,29 @@ describe("runCli", () => {
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toContain("Google Calendar / events-list");
     expect(result.stdout).toContain("Default text output is summarized for this Google Calendar action");
+  });
+
+  it("prioritizes featured Google Calendar actions in the full action list", async () => {
+    const gateway = createFakeGateway({
+      actionsByToolkit: {
+        googlecalendar: googleCalendarActions,
+      },
+      connections: [
+        { id: "conn_1", toolkitSlug: "googlecalendar", status: "ACTIVE", userId: "default" },
+      ],
+    });
+
+    const result = await runCli(["google-calendar", "actions", "--api-key", "test-key"], {
+      gatewayFactory: gateway.factory,
+    });
+
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toContain("Recommended first actions:");
+    expect(result.stdout).toContain("events-list: List upcoming events from one calendar.");
+    expect(result.stdout).toContain("events-get: Read one event by its event ID.");
+    expect(result.stdout).toContain("create-event: Create a calendar event with time, title, and attendees.");
+    expect(result.stdout.indexOf("events-list")).toBeLessThan(result.stdout.indexOf("find-free-slots"));
+    expect(result.stdout.indexOf("find-free-slots")).toBeLessThan(result.stdout.indexOf("list-calendars"));
   });
 
   it("summarizes Gmail fetch-emails output by default", async () => {

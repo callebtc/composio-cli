@@ -10,7 +10,11 @@ import type {
 } from "./types.js";
 import { getDisplayActionAliases } from "./toolkits/actions.js";
 import { hasSummaryDefault, renderSummarizedExecutionResult } from "./toolkits/output.js";
-import type { ToolkitDefinition } from "./toolkits/shared.js";
+import {
+  getFeaturedActionHelp,
+  prioritizeToolkitActions,
+  type ToolkitDefinition,
+} from "./toolkits/shared.js";
 import { indent, pluralize, titleCaseWords, toFlagName, truncate } from "./utils/strings.js";
 
 export function renderRootHelp(options: {
@@ -74,6 +78,8 @@ export function renderToolkitList(toolkits: ToolkitDefinition[], userId: string)
 }
 
 export function renderToolkitGuide(toolkit: ToolkitDefinition, actions?: ToolkitAction[]): string {
+  const prioritized = actions ? prioritizeToolkitActions(toolkit, actions) : undefined;
+  const featuredActions = prioritized?.featured ?? [];
   const lines = [
     `${toolkit.displayName} — ${toolkit.summary}`,
     "",
@@ -88,16 +94,30 @@ export function renderToolkitGuide(toolkit: ToolkitDefinition, actions?: Toolkit
     `  5. Pipe JSON from stdin:  echo '{"key":"value"}' | ${CLI_NAME} ${toolkit.cliName} <action>`,
     `  6. Trim text output:      ${CLI_NAME} ${toolkit.cliName} <action> --fields id,summary`,
     "",
-    "Suggested starting actions:",
-    ...toolkit.examples.map(example => `  ${CLI_NAME} ${toolkit.cliName} inspect ${example}`),
   ];
 
-  if (actions && actions.length > 0) {
-    lines.push("", `Discovered actions (${actions.length} total, showing ${Math.min(actions.length, TOOLKIT_PREVIEW_LIMIT)}):`);
-    actions.slice(0, TOOLKIT_PREVIEW_LIMIT).forEach(action => {
-      lines.push(`  ${formatActionRow(action)}`);
+  if (featuredActions.length > 0) {
+    lines.push("Recommended first actions:");
+    featuredActions.forEach(entry => {
+      lines.push(`  ${formatFeaturedAction(entry.action.cliName, entry.feature.shortHelp)}`);
     });
-    if (actions.length > TOOLKIT_PREVIEW_LIMIT) {
+    lines.push(`  Inspect one: ${CLI_NAME} ${toolkit.cliName} inspect ${featuredActions[0]!.action.cliName}`);
+  } else {
+    lines.push("Suggested starting actions:");
+    toolkit.examples.forEach(example => {
+      lines.push(`  ${CLI_NAME} ${toolkit.cliName} inspect ${example}`);
+    });
+  }
+
+  if (actions && actions.length > 0) {
+    const previewActions = prioritized?.remaining ?? actions;
+    const previewCount = Math.min(previewActions.length, TOOLKIT_PREVIEW_LIMIT);
+    const heading = featuredActions.length > 0 ? "Other discovered actions" : "Discovered actions";
+    lines.push("", `${heading} (${actions.length} total, showing ${previewCount}):`);
+    previewActions.slice(0, TOOLKIT_PREVIEW_LIMIT).forEach(action => {
+      lines.push(`  ${formatActionRow(toolkit, action)}`);
+    });
+    if (previewActions.length > TOOLKIT_PREVIEW_LIMIT) {
       lines.push(`  ... run '${CLI_NAME} ${toolkit.cliName} actions' to see the full list.`);
     }
   } else {
@@ -110,6 +130,7 @@ export function renderToolkitGuide(toolkit: ToolkitDefinition, actions?: Toolkit
 }
 
 export function renderActionList(toolkit: ToolkitDefinition, actions: ToolkitAction[]): string {
+  const prioritized = prioritizeToolkitActions(toolkit, actions);
   const lines = [
     `${toolkit.displayName} actions (${actions.length})`,
     "",
@@ -117,8 +138,17 @@ export function renderActionList(toolkit: ToolkitDefinition, actions: ToolkitAct
     `  ${CLI_NAME} ${toolkit.cliName} inspect <action>`,
     `  ${CLI_NAME} ${toolkit.cliName} <action> [options]`,
     "",
+    ...(prioritized.featured.length > 0
+      ? [
+          "Recommended first actions:",
+          ...prioritized.featured.map(
+            entry => `  ${formatFeaturedAction(entry.action.cliName, entry.feature.shortHelp)}`
+          ),
+          "",
+        ]
+      : []),
     "Actions:",
-    ...actions.map(action => `  ${formatActionRow(action)}`),
+    ...prioritized.ordered.map(action => `  ${formatActionRow(toolkit, action)}`),
     "",
   ];
   return lines.join("\n");
@@ -399,14 +429,23 @@ function propertyTypeLabel(property: JsonSchemaProperty | undefined): string {
   return property.type.join("|");
 }
 
-function formatActionRow(action: ToolkitAction): string {
-  const suffix = action.description ? truncate(action.description, 70) : truncate(action.name, 70);
+function formatActionRow(toolkit: ToolkitDefinition, action: ToolkitAction): string {
+  const featuredHelp = getFeaturedActionHelp(toolkit, action);
+  const suffix = featuredHelp
+    ? truncate(featuredHelp, 70)
+    : action.description
+      ? truncate(action.description, 70)
+      : truncate(action.name, 70);
   const deprecated = action.isDeprecated ? " [deprecated]" : "";
   return formatRow(action.cliName, `${suffix}${deprecated}`, 24);
 }
 
 function formatRow(left: string, right: string, width: number): string {
-  return `${left.padEnd(width)}${right}`;
+  return left.length >= width ? `${left} ${right}` : `${left.padEnd(width)}${right}`;
+}
+
+function formatFeaturedAction(actionName: string, shortHelp: string): string {
+  return `${actionName}: ${shortHelp}`;
 }
 
 export function renderUnknownToolkit(
