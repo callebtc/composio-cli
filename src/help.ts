@@ -97,29 +97,22 @@ export function renderToolkitGuide(toolkit: ToolkitDefinition, actions?: Toolkit
   ];
 
   if (featuredActions.length > 0) {
-    lines.push("Recommended first actions:");
+    lines.push("Recommended actions:");
     featuredActions.forEach(entry => {
       lines.push(`  ${formatFeaturedAction(entry.action.cliName, entry.feature.shortHelp)}`);
     });
     lines.push(`  Inspect one: ${CLI_NAME} ${toolkit.cliName} inspect ${featuredActions[0]!.action.cliName}`);
   } else {
-    lines.push("Suggested starting actions:");
+    lines.push("Recommended actions:");
     toolkit.examples.forEach(example => {
       lines.push(`  ${CLI_NAME} ${toolkit.cliName} inspect ${example}`);
     });
   }
 
   if (actions && actions.length > 0) {
-    const previewActions = prioritized?.remaining ?? actions;
-    const previewCount = Math.min(previewActions.length, TOOLKIT_PREVIEW_LIMIT);
-    const heading = featuredActions.length > 0 ? "Other discovered actions" : "Discovered actions";
-    lines.push("", `${heading} (${actions.length} total, showing ${previewCount}):`);
-    previewActions.slice(0, TOOLKIT_PREVIEW_LIMIT).forEach(action => {
-      lines.push(`  ${formatActionRow(toolkit, action)}`);
-    });
-    if (previewActions.length > TOOLKIT_PREVIEW_LIMIT) {
-      lines.push(`  ... run '${CLI_NAME} ${toolkit.cliName} actions' to see the full list.`);
-    }
+    lines.push("");
+    lines.push(`Discovered actions: ${actions.length} total.`);
+    lines.push(`Run '${CLI_NAME} ${toolkit.cliName} actions' to see the full list.`);
   } else {
     lines.push("", "Live action preview:");
     lines.push(`  Provide --api-key or set ${API_KEY_ENV} to fetch the current action list from Composio.`);
@@ -140,7 +133,7 @@ export function renderActionList(toolkit: ToolkitDefinition, actions: ToolkitAct
     "",
     ...(prioritized.featured.length > 0
       ? [
-          "Recommended first actions:",
+          "Recommended actions:",
           ...prioritized.featured.map(
             entry => `  ${formatFeaturedAction(entry.action.cliName, entry.feature.shortHelp)}`
           ),

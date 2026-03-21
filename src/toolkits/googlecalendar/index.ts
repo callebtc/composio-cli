@@ -39,6 +39,31 @@ export const googleCalendarToolkit = defineToolkit({
       priority: 60,
       shortHelp: "See which calendars are available to query.",
     },
+    {
+      canonical: "find-event",
+      priority: 50,
+      shortHelp: "Search for matching events by text or filters.",
+    },
+    {
+      canonical: "patch-event",
+      priority: 40,
+      shortHelp: "Update a few fields on an existing event.",
+    },
+    {
+      canonical: "update-event",
+      priority: 30,
+      shortHelp: "Replace an event when you have the full payload.",
+    },
+    {
+      canonical: "quick-add",
+      priority: 20,
+      shortHelp: "Create an event from natural-language text.",
+    },
+    {
+      canonical: "get-calendar",
+      priority: 10,
+      shortHelp: "Inspect one calendar by calendar ID.",
+    },
   ],
   outputSummary: googleCalendarOutputSummary,
 });

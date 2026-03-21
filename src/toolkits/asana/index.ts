@@ -35,5 +35,30 @@ export const asanaToolkit = defineToolkit({
       priority: 60,
       shortHelp: "Comment on a task.",
     },
+    {
+      canonical: "get-a-task",
+      priority: 50,
+      shortHelp: "Read one task in detail.",
+    },
+    {
+      canonical: "get-sections-in-project",
+      priority: 40,
+      shortHelp: "List sections inside a project.",
+    },
+    {
+      canonical: "create-subtask",
+      priority: 30,
+      shortHelp: "Create a subtask under an existing task.",
+    },
+    {
+      canonical: "add-task-to-section",
+      priority: 20,
+      shortHelp: "Move or add a task into a project section.",
+    },
+    {
+      canonical: "search-tasks-in-workspace",
+      priority: 10,
+      shortHelp: "Search tasks across a workspace.",
+    },
   ],
 });

@@ -35,5 +35,30 @@ export const whatsappToolkit = defineToolkit({
       priority: 60,
       shortHelp: "Create a new template for review.",
     },
+    {
+      canonical: "send-interactive-buttons",
+      priority: 50,
+      shortHelp: "Send a WhatsApp message with interactive buttons.",
+    },
+    {
+      canonical: "send-interactive-list",
+      priority: 40,
+      shortHelp: "Send a WhatsApp list selection message.",
+    },
+    {
+      canonical: "send-location",
+      priority: 30,
+      shortHelp: "Send a location message.",
+    },
+    {
+      canonical: "upload-media",
+      priority: 20,
+      shortHelp: "Upload media before sending it.",
+    },
+    {
+      canonical: "get-business-profile",
+      priority: 10,
+      shortHelp: "Inspect the connected business profile.",
+    },
   ],
 });

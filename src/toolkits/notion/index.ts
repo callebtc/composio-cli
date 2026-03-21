@@ -35,5 +35,30 @@ export const notionToolkit = defineToolkit({
       priority: 60,
       shortHelp: "Create or update a database row.",
     },
+    {
+      canonical: "fetch-block-contents",
+      priority: 50,
+      shortHelp: "Read the blocks inside a page or block.",
+    },
+    {
+      canonical: "update-page",
+      priority: 40,
+      shortHelp: "Update page properties like title or status.",
+    },
+    {
+      canonical: "fetch-database",
+      priority: 30,
+      shortHelp: "Inspect one database and its schema.",
+    },
+    {
+      canonical: "fetch-row",
+      priority: 20,
+      shortHelp: "Retrieve one database row by ID.",
+    },
+    {
+      canonical: "insert-row-database",
+      priority: 10,
+      shortHelp: "Insert a new row into a Notion database.",
+    },
   ],
 });

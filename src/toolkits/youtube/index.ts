@@ -35,5 +35,30 @@ export const youtubeToolkit = defineToolkit({
       priority: 60,
       shortHelp: "Inspect channel metrics and counts.",
     },
+    {
+      canonical: "list-user-playlists",
+      priority: 50,
+      shortHelp: "List playlists for the current user.",
+    },
+    {
+      canonical: "list-playlist-items",
+      priority: 40,
+      shortHelp: "List videos inside a playlist.",
+    },
+    {
+      canonical: "get-video-details-batch",
+      priority: 30,
+      shortHelp: "Fetch details for multiple videos at once.",
+    },
+    {
+      canonical: "list-comment-threads",
+      priority: 20,
+      shortHelp: "Read comment threads on a video.",
+    },
+    {
+      canonical: "create-playlist",
+      priority: 10,
+      shortHelp: "Create a new YouTube playlist.",
+    },
   ],
 });

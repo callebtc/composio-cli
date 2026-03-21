@@ -35,5 +35,30 @@ export const dropboxToolkit = defineToolkit({
       priority: 60,
       shortHelp: "Create a folder before uploading files.",
     },
+    {
+      canonical: "read-file",
+      priority: 50,
+      shortHelp: "Read the contents of a Dropbox file.",
+    },
+    {
+      canonical: "get-metadata",
+      priority: 40,
+      shortHelp: "Inspect one file or folder's metadata.",
+    },
+    {
+      canonical: "move-file-or-folder",
+      priority: 30,
+      shortHelp: "Move or rename a file or folder.",
+    },
+    {
+      canonical: "list-shared-links",
+      priority: 20,
+      shortHelp: "List shared links available to the account.",
+    },
+    {
+      canonical: "get-temporary-link",
+      priority: 10,
+      shortHelp: "Get a short-lived direct download link for a file.",
+    },
   ],
 });

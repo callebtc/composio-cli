@@ -35,5 +35,30 @@ export const jiraToolkit = defineToolkit({
       priority: 60,
       shortHelp: "List boards before inspecting sprints.",
     },
+    {
+      canonical: "edit-issue",
+      priority: 50,
+      shortHelp: "Update fields on an existing Jira issue.",
+    },
+    {
+      canonical: "add-comment",
+      priority: 40,
+      shortHelp: "Comment on an issue.",
+    },
+    {
+      canonical: "assign-issue",
+      priority: 30,
+      shortHelp: "Assign an issue to a user.",
+    },
+    {
+      canonical: "list-sprints",
+      priority: 20,
+      shortHelp: "List sprints for a board.",
+    },
+    {
+      canonical: "get-project",
+      priority: 10,
+      shortHelp: "Inspect one Jira project.",
+    },
   ],
 });

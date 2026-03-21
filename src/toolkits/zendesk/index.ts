@@ -35,5 +35,30 @@ export const zendeskToolkit = defineToolkit({
       priority: 60,
       shortHelp: "Reply to an existing ticket thread.",
     },
+    {
+      canonical: "list-zendesk-users",
+      priority: 50,
+      shortHelp: "List users in Zendesk.",
+    },
+    {
+      canonical: "search-zendesk-users",
+      priority: 40,
+      shortHelp: "Search for users by name or email.",
+    },
+    {
+      canonical: "create-zendesk-user",
+      priority: 30,
+      shortHelp: "Create a new Zendesk user.",
+    },
+    {
+      canonical: "update-zendesk-ticket",
+      priority: 20,
+      shortHelp: "Update ticket fields or status.",
+    },
+    {
+      canonical: "get-all-zendesk-organizations",
+      priority: 10,
+      shortHelp: "List Zendesk organizations.",
+    },
   ],
 });

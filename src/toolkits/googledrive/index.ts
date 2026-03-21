@@ -36,5 +36,30 @@ export const googleDriveToolkit = defineToolkit({
       priority: 60,
       shortHelp: "Download a file when you need the raw contents.",
     },
+    {
+      canonical: "list-files",
+      priority: 50,
+      shortHelp: "List files across Drive with broader filters.",
+    },
+    {
+      canonical: "get-file-metadata",
+      priority: 40,
+      shortHelp: "Inspect one file's metadata and parents.",
+    },
+    {
+      canonical: "create-file-from-text",
+      priority: 30,
+      shortHelp: "Create a text file directly from inline content.",
+    },
+    {
+      canonical: "parse-file",
+      priority: 20,
+      shortHelp: "Extract readable content from a Drive file.",
+    },
+    {
+      canonical: "edit-file",
+      priority: 10,
+      shortHelp: "Update an existing Drive file.",
+    },
   ],
 });

@@ -35,5 +35,30 @@ export const figmaToolkit = defineToolkit({
       priority: 60,
       shortHelp: "Inspect file metadata and structure.",
     },
+    {
+      canonical: "render-images-of-file-nodes",
+      priority: 50,
+      shortHelp: "Render image exports for specific nodes.",
+    },
+    {
+      canonical: "get-file-components",
+      priority: 40,
+      shortHelp: "List components defined in a Figma file.",
+    },
+    {
+      canonical: "get-local-variables",
+      priority: 30,
+      shortHelp: "Inspect local variables and design tokens.",
+    },
+    {
+      canonical: "design-tokens-to-tailwind",
+      priority: 20,
+      shortHelp: "Convert extracted tokens into Tailwind-ready output.",
+    },
+    {
+      canonical: "get-comments-in-a-file",
+      priority: 10,
+      shortHelp: "Read comments on a Figma file.",
+    },
   ],
 });

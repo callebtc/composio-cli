@@ -35,5 +35,30 @@ export const airtableToolkit = defineToolkit({
       priority: 60,
       shortHelp: "Update fields on an existing record.",
     },
+    {
+      canonical: "create-multiple-records",
+      priority: 50,
+      shortHelp: "Create multiple records in one request.",
+    },
+    {
+      canonical: "update-multiple-records",
+      priority: 40,
+      shortHelp: "Update multiple Airtable records at once.",
+    },
+    {
+      canonical: "upload-attachment",
+      priority: 30,
+      shortHelp: "Upload a file attachment to a record.",
+    },
+    {
+      canonical: "get-base-schema",
+      priority: 20,
+      shortHelp: "Inspect tables and fields in a base.",
+    },
+    {
+      canonical: "create-record-from-natural-language",
+      priority: 10,
+      shortHelp: "Create a record from a natural-language prompt.",
+    },
   ],
 });

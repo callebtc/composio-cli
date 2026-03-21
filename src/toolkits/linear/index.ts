@@ -35,5 +35,30 @@ export const linearToolkit = defineToolkit({
       priority: 60,
       shortHelp: "Update status, assignee, or fields on an issue.",
     },
+    {
+      canonical: "list-linear-projects",
+      priority: 50,
+      shortHelp: "Browse projects in the workspace.",
+    },
+    {
+      canonical: "list-linear-teams",
+      priority: 40,
+      shortHelp: "List teams before filtering issues.",
+    },
+    {
+      canonical: "list-linear-states",
+      priority: 30,
+      shortHelp: "Inspect workflow states for a team.",
+    },
+    {
+      canonical: "get-linear-project",
+      priority: 20,
+      shortHelp: "Read one project in detail.",
+    },
+    {
+      canonical: "create-linear-project",
+      priority: 10,
+      shortHelp: "Create a new Linear project.",
+    },
   ],
 });

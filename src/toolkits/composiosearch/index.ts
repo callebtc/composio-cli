@@ -37,5 +37,30 @@ export const composioSearchToolkit = defineToolkit({
       priority: 60,
       shortHelp: "Search places and local business results.",
     },
+    {
+      canonical: "finance",
+      priority: 50,
+      shortHelp: "Look up financial prices and market data.",
+    },
+    {
+      canonical: "image",
+      priority: 40,
+      shortHelp: "Search for images related to a query.",
+    },
+    {
+      canonical: "trends",
+      priority: 30,
+      shortHelp: "Inspect search trends and relative interest.",
+    },
+    {
+      canonical: "shopping",
+      priority: 20,
+      shortHelp: "Search products and prices across retailers.",
+    },
+    {
+      canonical: "event",
+      priority: 10,
+      shortHelp: "Search for upcoming local or virtual events.",
+    },
   ],
 });

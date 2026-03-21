@@ -35,5 +35,30 @@ export const hubspotToolkit = defineToolkit({
       priority: 60,
       shortHelp: "Create a new deal.",
     },
+    {
+      canonical: "read-contact",
+      priority: 50,
+      shortHelp: "Read one contact record.",
+    },
+    {
+      canonical: "get-deal",
+      priority: 40,
+      shortHelp: "Read one deal record.",
+    },
+    {
+      canonical: "search-deals",
+      priority: 30,
+      shortHelp: "Search deals by filters or criteria.",
+    },
+    {
+      canonical: "update-contact",
+      priority: 20,
+      shortHelp: "Update an existing contact.",
+    },
+    {
+      canonical: "update-deal",
+      priority: 10,
+      shortHelp: "Update an existing deal.",
+    },
   ],
 });

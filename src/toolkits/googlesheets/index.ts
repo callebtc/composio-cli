@@ -36,5 +36,30 @@ export const googleSheetsToolkit = defineToolkit({
       priority: 60,
       shortHelp: "See available tabs before reading or writing.",
     },
+    {
+      canonical: "batch-get",
+      priority: 50,
+      shortHelp: "Read multiple ranges in one request.",
+    },
+    {
+      canonical: "get-spreadsheet-info",
+      priority: 40,
+      shortHelp: "Inspect spreadsheet metadata and sheet structure.",
+    },
+    {
+      canonical: "find-worksheet-by-title",
+      priority: 30,
+      shortHelp: "Resolve a sheet tab by its title.",
+    },
+    {
+      canonical: "search-spreadsheets",
+      priority: 20,
+      shortHelp: "Search for spreadsheets by name.",
+    },
+    {
+      canonical: "upsert-rows",
+      priority: 10,
+      shortHelp: "Insert or update rows by key fields.",
+    },
   ],
 });

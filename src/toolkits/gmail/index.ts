@@ -36,6 +36,31 @@ export const gmailToolkit = defineToolkit({
       priority: 60,
       shortHelp: "Reply inside an existing Gmail thread.",
     },
+    {
+      canonical: "list-labels",
+      priority: 50,
+      shortHelp: "List Gmail labels and the IDs needed for filtering.",
+    },
+    {
+      canonical: "list-threads",
+      priority: 40,
+      shortHelp: "Browse conversation threads instead of individual messages.",
+    },
+    {
+      canonical: "list-drafts",
+      priority: 30,
+      shortHelp: "List saved drafts before editing or sending them.",
+    },
+    {
+      canonical: "send-draft",
+      priority: 20,
+      shortHelp: "Send an existing draft as-is.",
+    },
+    {
+      canonical: "get-contacts",
+      priority: 10,
+      shortHelp: "Look up saved Google contacts before composing mail.",
+    },
   ],
   outputSummary: gmailOutputSummary,
 });

@@ -35,5 +35,30 @@ export const spotifyToolkit = defineToolkit({
       priority: 60,
       shortHelp: "Search Spotify for tracks, artists, or playlists.",
     },
+    {
+      canonical: "get-playlist-items",
+      priority: 50,
+      shortHelp: "List tracks inside a playlist.",
+    },
+    {
+      canonical: "remove-playlist-items",
+      priority: 40,
+      shortHelp: "Remove tracks from a playlist.",
+    },
+    {
+      canonical: "get-track",
+      priority: 30,
+      shortHelp: "Inspect one track in detail.",
+    },
+    {
+      canonical: "get-recommendations",
+      priority: 20,
+      shortHelp: "Get track recommendations from seed inputs.",
+    },
+    {
+      canonical: "start-resume-playback",
+      priority: 10,
+      shortHelp: "Start or resume playback on an active device.",
+    },
   ],
 });

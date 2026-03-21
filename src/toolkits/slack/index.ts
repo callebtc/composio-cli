@@ -35,5 +35,30 @@ export const slackToolkit = defineToolkit({
       priority: 60,
       shortHelp: "Join a public channel before participating.",
     },
+    {
+      canonical: "search-messages",
+      priority: 50,
+      shortHelp: "Search Slack messages by keyword.",
+    },
+    {
+      canonical: "open-dm",
+      priority: 40,
+      shortHelp: "Open a direct message channel with a user.",
+    },
+    {
+      canonical: "find-user-by-email-address",
+      priority: 30,
+      shortHelp: "Resolve a user from an email address.",
+    },
+    {
+      canonical: "retrieve-message-permalink-url",
+      priority: 20,
+      shortHelp: "Get a permalink for a specific Slack message.",
+    },
+    {
+      canonical: "list-conversations",
+      priority: 10,
+      shortHelp: "List conversations when you need broader channel coverage.",
+    },
   ],
 });

@@ -35,5 +35,30 @@ export const twitterToolkit = defineToolkit({
       priority: 60,
       shortHelp: "Resolve a username to a Twitter user.",
     },
+    {
+      canonical: "user-home-timeline-by-user-id",
+      priority: 50,
+      shortHelp: "Read a user's home timeline.",
+    },
+    {
+      canonical: "followers-by-user-id",
+      priority: 40,
+      shortHelp: "List followers for a user.",
+    },
+    {
+      canonical: "following-by-user-id",
+      priority: 30,
+      shortHelp: "List who a user follows.",
+    },
+    {
+      canonical: "user-like-post",
+      priority: 20,
+      shortHelp: "Like a post on behalf of the user.",
+    },
+    {
+      canonical: "retweet-post",
+      priority: 10,
+      shortHelp: "Retweet a post.",
+    },
   ],
 });

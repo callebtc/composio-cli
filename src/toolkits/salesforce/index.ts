@@ -35,5 +35,30 @@ export const salesforceToolkit = defineToolkit({
       priority: 60,
       shortHelp: "Create a new lead.",
     },
+    {
+      canonical: "get-account",
+      priority: 50,
+      shortHelp: "Read one account record.",
+    },
+    {
+      canonical: "search-accounts",
+      priority: 40,
+      shortHelp: "Search accounts by name or query.",
+    },
+    {
+      canonical: "create-opportunity",
+      priority: 30,
+      shortHelp: "Create a new opportunity.",
+    },
+    {
+      canonical: "update-opportunity",
+      priority: 20,
+      shortHelp: "Update an existing opportunity.",
+    },
+    {
+      canonical: "query",
+      priority: 10,
+      shortHelp: "Run a SOQL query across Salesforce data.",
+    },
   ],
 });
