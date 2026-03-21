@@ -49,6 +49,67 @@ const gmailActions: ToolkitAction[] = [
   },
 ];
 
+const googleCalendarActions: ToolkitAction[] = [
+  {
+    slug: "GOOGLECALENDAR_LIST_CALENDARS",
+    name: "List Calendars",
+    description: "List accessible calendars.",
+    toolkitSlug: "googlecalendar",
+    cliName: "list-calendars",
+    aliases: ["list-calendars", "googlecalendar-list-calendars"],
+    version: "20260101_00",
+    inputSchema: {
+      type: "object",
+      properties: {
+        max_results: {
+          type: "integer",
+          description: "Maximum number of calendars to return.",
+        },
+      },
+    },
+  },
+  {
+    slug: "GOOGLECALENDAR_EVENTS_LIST",
+    name: "Events List",
+    description: "List events from a calendar.",
+    toolkitSlug: "googlecalendar",
+    cliName: "events-list",
+    aliases: ["events-list", "googlecalendar-events-list"],
+    version: "20260101_00",
+    inputSchema: {
+      type: "object",
+      properties: {
+        calendar_id: {
+          type: "string",
+          description: "Calendar identifier.",
+        },
+        max_results: {
+          type: "integer",
+          description: "Maximum number of events to return.",
+        },
+      },
+    },
+  },
+  {
+    slug: "GOOGLECALENDAR_FIND_FREE_SLOTS",
+    name: "Find Free Slots",
+    description: "Find free slots for one or more calendars.",
+    toolkitSlug: "googlecalendar",
+    cliName: "find-free-slots",
+    aliases: ["find-free-slots", "googlecalendar-find-free-slots"],
+    version: "20260101_00",
+    inputSchema: {
+      type: "object",
+      properties: {
+        items: {
+          type: "array",
+          description: "Calendars to query.",
+        },
+      },
+    },
+  },
+];
+
 describe("runCli", () => {
   it("renders the root guide by default", async () => {
     const result = await runCli([]);
@@ -118,6 +179,28 @@ describe("runCli", () => {
     expect(result.stdout).toContain("Gmail / fetch-emails");
     expect(result.stdout).toContain("Default text output is summarized for this Gmail action");
     expect(result.stdout).toContain("Required top-level fields: max_results");
+  });
+
+  it("renders Google Calendar action help with summary guidance", async () => {
+    const gateway = createFakeGateway({
+      actionsByToolkit: {
+        googlecalendar: googleCalendarActions,
+      },
+      connections: [
+        { id: "conn_1", toolkitSlug: "googlecalendar", status: "ACTIVE", userId: "default" },
+      ],
+    });
+
+    const result = await runCli(
+      ["google-calendar", "events-list", "--help", "--api-key", "test-key"],
+      {
+        gatewayFactory: gateway.factory,
+      }
+    );
+
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toContain("Google Calendar / events-list");
+    expect(result.stdout).toContain("Default text output is summarized for this Google Calendar action");
   });
 
   it("summarizes Gmail fetch-emails output by default", async () => {
@@ -196,6 +279,142 @@ describe("runCli", () => {
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toContain("No messages found.");
     expect(result.stdout).toContain("Use --json for the full response.");
+    expect(result.stdout).not.toContain("Data:");
+  });
+
+  it("summarizes Google Calendar list-calendars output by default", async () => {
+    const gateway = createFakeGateway({
+      actionsByToolkit: {
+        googlecalendar: googleCalendarActions,
+      },
+      connections: [
+        { id: "conn_1", toolkitSlug: "googlecalendar", status: "ACTIVE", userId: "default" },
+      ],
+      executeResult: () => ({
+        successful: true,
+        data: {
+          calendars: [
+            {
+              id: "primary",
+              summary: "Primary Calendar",
+              accessRole: "owner",
+              primary: true,
+              selected: true,
+              timeZone: "Europe/Berlin",
+            },
+          ],
+        },
+      }),
+    });
+
+    const result = await runCli(["google-calendar", "list-calendars", "--api-key", "test-key"], {
+      gatewayFactory: gateway.factory,
+      stdoutIsTTY: false,
+    });
+
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toContain("Google Calendar / list-calendars");
+    expect(result.stdout).toContain("Summary: 1 calendar");
+    expect(result.stdout).toContain("Primary Calendar");
+    expect(result.stdout).toContain("Calendar ID: primary");
+    expect(result.stdout).toContain("Access: owner");
+    expect(result.stdout).toContain("Time zone: Europe/Berlin");
+    expect(result.stdout).toContain("Use --json for the full response.");
+    expect(result.stdout).not.toContain("Data:");
+  });
+
+  it("summarizes Google Calendar event lists by default", async () => {
+    const gateway = createFakeGateway({
+      actionsByToolkit: {
+        googlecalendar: googleCalendarActions,
+      },
+      connections: [
+        { id: "conn_1", toolkitSlug: "googlecalendar", status: "ACTIVE", userId: "default" },
+      ],
+      executeResult: () => ({
+        successful: true,
+        data: {
+          nextPageToken: "page_2",
+          items: [
+            {
+              id: "evt_1",
+              summary: "Design review",
+              status: "confirmed",
+              start: { dateTime: "2026-03-21T09:00:00Z" },
+              end: { dateTime: "2026-03-21T10:00:00Z" },
+              organizer: { email: "owner@example.com" },
+              attendees: [{ email: "a@example.com" }, { email: "b@example.com" }],
+              location: "Room 4",
+            },
+          ],
+        },
+      }),
+    });
+
+    const result = await runCli(
+      ["google-calendar", "events-list", "--api-key", "test-key", "--calendar-id", "primary"],
+      {
+        gatewayFactory: gateway.factory,
+        stdoutIsTTY: false,
+      }
+    );
+
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toContain("Google Calendar / events-list");
+    expect(result.stdout).toContain("Summary: 1 event");
+    expect(result.stdout).toContain("Design review");
+    expect(result.stdout).toContain("Event ID: evt_1");
+    expect(result.stdout).toContain("Start: 2026-03-21T09:00:00Z");
+    expect(result.stdout).toContain("End: 2026-03-21T10:00:00Z");
+    expect(result.stdout).toContain("Organizer: owner@example.com");
+    expect(result.stdout).toContain("Attendees: 2");
+    expect(result.stdout).toContain("Location: Room 4");
+    expect(result.stdout).toContain("Next page token: page_2");
+    expect(result.stdout).not.toContain("Data:");
+  });
+
+  it("summarizes Google Calendar free-slot output by default", async () => {
+    const gateway = createFakeGateway({
+      actionsByToolkit: {
+        googlecalendar: googleCalendarActions,
+      },
+      connections: [
+        { id: "conn_1", toolkitSlug: "googlecalendar", status: "ACTIVE", userId: "default" },
+      ],
+      executeResult: () => ({
+        successful: true,
+        data: {
+          timeMin: "2026-03-21T00:00:00Z",
+          timeMax: "2026-03-22T00:00:00Z",
+          calendars: {
+            primary: {
+              busy: [{ start: "2026-03-21T14:00:00Z", end: "2026-03-21T14:30:00Z" }],
+              free: [{ start: "2026-03-21T00:00:00Z", end: "2026-03-21T14:00:00Z" }],
+              is_reliable: true,
+            },
+          },
+        },
+      }),
+    });
+
+    const result = await runCli(
+      ["google-calendar", "find-free-slots", "--api-key", "test-key", "--items", '["primary"]'],
+      {
+        gatewayFactory: gateway.factory,
+        stdoutIsTTY: false,
+      }
+    );
+
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toContain("Google Calendar / find-free-slots");
+    expect(result.stdout).toContain("Summary: 1 calendar in availability window");
+    expect(result.stdout).toContain("Window: 2026-03-21T00:00:00Z -> 2026-03-22T00:00:00Z");
+    expect(result.stdout).toContain("primary");
+    expect(result.stdout).toContain("Busy slots: 1");
+    expect(result.stdout).toContain("Free slots: 1");
+    expect(result.stdout).toContain("Reliable: yes");
+    expect(result.stdout).toContain("First free: 2026-03-21T00:00:00Z -> 2026-03-21T14:00:00Z");
+    expect(result.stdout).toContain("First busy: 2026-03-21T14:00:00Z -> 2026-03-21T14:30:00Z");
     expect(result.stdout).not.toContain("Data:");
   });
 

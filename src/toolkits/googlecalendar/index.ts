@@ -1,4 +1,5 @@
 import { defineToolkit } from "../shared.js";
+import { googleCalendarOutputSummary } from "./summary.js";
 
 export const googleCalendarToolkit = defineToolkit({
   directoryName: "googlecalendar",
@@ -10,5 +11,5 @@ export const googleCalendarToolkit = defineToolkit({
   examples: ["list-calendars", "find-event", "find-free-slots"],
   readCheckActions: ["list-calendars", "find-event", "events-list"],
   aliases: ["googlecalendar", "calendar"],
+  outputSummary: googleCalendarOutputSummary,
 });
-
