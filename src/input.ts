@@ -1,6 +1,11 @@
-import type { JsonSchemaObject, JsonSchemaProperty, ToolkitAction } from "./types.js";
+import type {
+  CliDisplayOptions,
+  JsonSchemaObject,
+  JsonSchemaProperty,
+  ToolkitAction,
+} from "./types.js";
 import { coerceSchemaValue, inferPrimitive, parseJsonObject, setAtPath } from "./utils/json.js";
-import { normalizeToken } from "./utils/strings.js";
+import { normalizeToken, unique } from "./utils/strings.js";
 
 export interface SharedFlags {
   apiKey?: string | undefined;
@@ -12,6 +17,7 @@ export interface SharedFlags {
   setExpressions: string[];
   toolVersion?: string | undefined;
   baseUrl?: string | undefined;
+  display: CliDisplayOptions;
   remainingTokens: string[];
 }
 
@@ -26,6 +32,10 @@ export function parseSharedFlags(argv: string[]): SharedFlags {
   let inputJson: string | undefined;
   let toolVersion: string | undefined;
   let baseUrl: string | undefined;
+  let allParameters = false;
+  let full = false;
+  let idsOnly = false;
+  let fields: string[] | undefined;
 
   for (let index = 0; index < argv.length; index += 1) {
     const token = argv[index]!;
@@ -51,6 +61,27 @@ export function parseSharedFlags(argv: string[]): SharedFlags {
       case "--base-url":
         baseUrl = expectValue(flag, inlineValue, argv[++index]);
         break;
+      case "--all-parameters":
+        allParameters = true;
+        break;
+      case "--full":
+        full = true;
+        break;
+      case "--ids-only":
+        idsOnly = true;
+        break;
+      case "--fields": {
+        const raw = expectValue(flag, inlineValue, argv[++index]);
+        const parsed = raw
+          .split(",")
+          .map(part => part.trim())
+          .filter(Boolean);
+        if (parsed.length === 0) {
+          throw new Error("--fields expects a comma-separated list of field names.");
+        }
+        fields = unique([...(fields ?? []), ...parsed]);
+        break;
+      }
       case "--json":
         json = true;
         break;
@@ -75,8 +106,35 @@ export function parseSharedFlags(argv: string[]): SharedFlags {
     setExpressions,
     toolVersion,
     baseUrl,
+    display: {
+      allParameters,
+      full,
+      idsOnly,
+      ...(fields ? { fields } : {}),
+    },
     remainingTokens,
   };
+}
+
+export function validateSharedFlags(flags: SharedFlags): void {
+  if (flags.json && flags.display.full) {
+    throw new Error("Use either --json or --full, not both.");
+  }
+  if (flags.json && flags.display.idsOnly) {
+    throw new Error("Use either --json or --ids-only, not both.");
+  }
+  if (flags.json && flags.display.fields && flags.display.fields.length > 0) {
+    throw new Error("Use either --json or --fields, not both.");
+  }
+  if (flags.display.full && flags.display.idsOnly) {
+    throw new Error("Use either --full or --ids-only, not both.");
+  }
+  if (flags.display.full && flags.display.fields && flags.display.fields.length > 0) {
+    throw new Error("Use either --full or --fields, not both.");
+  }
+  if (flags.display.idsOnly && flags.display.fields && flags.display.fields.length > 0) {
+    throw new Error("Use either --ids-only or --fields, not both.");
+  }
 }
 
 export function buildActionInput(options: {

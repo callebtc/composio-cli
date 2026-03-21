@@ -1,5 +1,27 @@
 import type { JsonSchemaObject, ToolkitAction } from "../types.js";
+import { chooseClosestIdentifier, type IdentifierResolution } from "../utils/identifiers.js";
 import { normalizeToken, toKebabCase, unique } from "../utils/strings.js";
+
+const COMMON_TRAILING_ACTION_VERBS = new Set([
+  "list",
+  "get",
+  "find",
+  "fetch",
+  "create",
+  "update",
+  "patch",
+  "delete",
+  "send",
+  "search",
+  "read",
+  "write",
+  "append",
+  "move",
+  "upload",
+  "join",
+  "edit",
+  "post",
+]);
 
 interface RawToolShape {
   slug: string;
@@ -20,6 +42,7 @@ export function buildToolkitAction(toolPrefix: string, tool: RawToolShape): Tool
   const cliName = toKebabCase(suffix);
   const slugHyphen = normalizeToken(tool.slug);
   const suffixHyphen = normalizeToken(suffix);
+  const friendlyAliases = deriveFriendlyActionAliases(cliName);
 
   return {
     slug: tool.slug,
@@ -34,6 +57,7 @@ export function buildToolkitAction(toolPrefix: string, tool: RawToolShape): Tool
     cliName,
     aliases: unique([
       cliName,
+      ...friendlyAliases,
       slugHyphen,
       suffixHyphen,
       tool.slug.toLowerCase(),
@@ -49,10 +73,79 @@ export function resolveToolkitAction(
 ): ToolkitAction | undefined {
   const normalized = normalizeToken(selector);
   return actions.find(action =>
-    action.cliName === normalized ||
-    action.slug.toLowerCase() === selector.toLowerCase() ||
-    action.aliases.includes(normalized)
+    collectActionAliases(action).some(alias => normalizeToken(alias) === normalized) ||
+    action.slug.toLowerCase() === selector.toLowerCase()
   );
+}
+
+export function resolveToolkitActionSelection(
+  actions: ToolkitAction[],
+  selector: string
+): {
+  action?: ToolkitAction;
+  resolution?: IdentifierResolution;
+} {
+  const exact = resolveToolkitAction(actions, selector);
+  if (exact) {
+    return { action: exact };
+  }
+
+  const candidates = actions.flatMap(action =>
+    collectActionAliases(action).map(candidate => ({ action, candidate }))
+  );
+  const uniqueCandidates = unique(candidates.map(entry => entry.candidate));
+  const resolution = chooseClosestIdentifier(selector, uniqueCandidates);
+  if (!resolution) {
+    return {};
+  }
+
+  const matched = candidates.find(entry => entry.candidate === resolution.value);
+  if (!matched) {
+    return {};
+  }
+
+  if (resolution.kind === "auto") {
+    return {
+      action: matched.action,
+      resolution: {
+        kind: "auto",
+        value: matched.action.cliName,
+      },
+    };
+  }
+
+  return {
+    resolution: {
+      kind: "suggest",
+      value: matched.action.cliName,
+    },
+  };
+}
+
+export function getDisplayActionAliases(action: ToolkitAction): string[] {
+  return deriveFriendlyActionAliases(action.cliName).filter(alias => alias !== action.cliName);
+}
+
+function collectActionAliases(action: ToolkitAction): string[] {
+  return unique([
+    action.cliName,
+    ...action.aliases,
+    ...deriveFriendlyActionAliases(action.cliName),
+  ]);
+}
+
+function deriveFriendlyActionAliases(cliName: string): string[] {
+  const parts = cliName.split("-").filter(Boolean);
+  if (parts.length < 2) {
+    return [];
+  }
+
+  const last = parts[parts.length - 1]!;
+  if (!COMMON_TRAILING_ACTION_VERBS.has(last)) {
+    return [];
+  }
+
+  return [`${last}-${parts.slice(0, -1).join("-")}`];
 }
 
 function stripToolPrefix(toolPrefix: string, slug: string): string {

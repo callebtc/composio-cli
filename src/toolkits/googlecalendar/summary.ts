@@ -1,4 +1,6 @@
 import type { ToolkitAction } from "../../types.js";
+import { buildReplayCommand, findInputProperty } from "../follow-up.js";
+import { formatSummaryModeSuffix, resolveRequestedSummaryFields } from "../summary-fields.js";
 import type { ToolkitOutputSummary, ToolkitSummaryRenderInput } from "../shared.js";
 
 const CALENDAR_LIST_ACTIONS = new Set([
@@ -65,9 +67,59 @@ function renderCalendarListSummary(
 
   const lines = [
     `${result.toolkit.displayName} / ${result.action.cliName}`,
-    `Summary: ${calendars.length} calendar${calendars.length === 1 ? "" : "s"}`,
+    `Summary: ${calendars.length} calendar${calendars.length === 1 ? "" : "s"}${formatSummaryModeSuffix(result.display)}`,
     "",
   ];
+
+  const requestedFields = resolveRequestedSummaryFields(
+    [
+      {
+        key: "calendar-id",
+        aliases: ["id"],
+        label: "Calendar ID",
+        value: (calendar: Record<string, unknown>) =>
+          asString(calendar.id) ?? asString(calendar.calendarId),
+      },
+      {
+        key: "name",
+        aliases: ["summary"],
+        label: "Name",
+        value: (calendar: Record<string, unknown>) =>
+          asString(calendar.summaryOverride) ??
+          asString(calendar.summary) ??
+          asString(calendar.displayName),
+      },
+      {
+        key: "access",
+        aliases: ["access-role"],
+        label: "Access",
+        value: (calendar: Record<string, unknown>) => asString(calendar.accessRole),
+      },
+      {
+        key: "time-zone",
+        aliases: ["timezone", "timeZone"],
+        label: "Time zone",
+        value: (calendar: Record<string, unknown>) => asString(calendar.timeZone),
+      },
+      {
+        key: "selected",
+        label: "Selected",
+        value: (calendar: Record<string, unknown>) => {
+          const selected = asBoolean(calendar.selected);
+          return selected === undefined ? "unknown" : selected ? "yes" : "no";
+        },
+      },
+      {
+        key: "primary",
+        label: "Primary",
+        value: (calendar: Record<string, unknown>) => {
+          const primary = asBoolean(calendar.primary);
+          return primary === undefined ? undefined : primary ? "yes" : "no";
+        },
+      },
+    ],
+    result.display.fields
+  );
 
   calendars.forEach((calendar, index) => {
     const id = asString(calendar.id) ?? asString(calendar.calendarId) ?? "unknown";
@@ -80,6 +132,19 @@ function renderCalendarListSummary(
     const timeZone = asString(calendar.timeZone);
     const selected = asBoolean(calendar.selected);
     const primary = asBoolean(calendar.primary);
+
+    if (result.display.idsOnly) {
+      lines.push(`${index + 1}. ${id}`);
+      return;
+    }
+
+    if (requestedFields) {
+      lines.push(`${index + 1}.`);
+      requestedFields.forEach(field => {
+        lines.push(`   ${field.label}: ${field.value(calendar) ?? "(empty)"}`);
+      });
+      return;
+    }
 
     lines.push(`${index + 1}. ${name}`);
     lines.push(`   Calendar ID: ${id}`);
@@ -96,7 +161,7 @@ function renderCalendarListSummary(
   });
 
   lines.push("");
-  lines.push("Use --json for the full response.");
+  lines.push("Use --full for the standard text summary or --json for the full response.");
   lines.push("");
   return lines.join("\n");
 }
@@ -115,18 +180,97 @@ function renderEventListSummary(
 
   const lines = [
     `${result.toolkit.displayName} / ${result.action.cliName}`,
-    `Summary: ${events.length} event${events.length === 1 ? "" : "s"}`,
+    `Summary: ${events.length} event${events.length === 1 ? "" : "s"}${formatSummaryModeSuffix(result.display)}`,
   ];
 
   const nextPageToken = asString(data.nextPageToken);
   if (nextPageToken) {
     lines.push(`Next page token: ${nextPageToken}`);
+    const pageTokenKey = findInputProperty(result.action.inputSchema, [
+      "page_token",
+      "pageToken",
+      "next_page_token",
+      "nextPageToken",
+    ]);
+    if (pageTokenKey) {
+      lines.push(
+        `Next page: ${buildReplayCommand(result, {
+          [pageTokenKey]: nextPageToken,
+        })}`
+      );
+    }
   }
   const nextSyncToken = asString(data.nextSyncToken);
   if (nextSyncToken) {
     lines.push(`Next sync token: ${nextSyncToken}`);
+    const syncTokenKey = findInputProperty(result.action.inputSchema, [
+      "sync_token",
+      "syncToken",
+      "next_sync_token",
+      "nextSyncToken",
+    ]);
+    if (syncTokenKey) {
+      lines.push(
+        `Sync later: ${buildReplayCommand(result, {
+          [syncTokenKey]: nextSyncToken,
+        })}`
+      );
+    }
   }
   lines.push("");
+
+  const requestedFields = resolveRequestedSummaryFields(
+    [
+      {
+        key: "event-id",
+        aliases: ["id"],
+        label: "Event ID",
+        value: (event: Record<string, unknown>) => asString(event.id),
+      },
+      {
+        key: "summary",
+        aliases: ["title"],
+        label: "Summary",
+        value: (event: Record<string, unknown>) => asString(event.summary),
+      },
+      {
+        key: "status",
+        label: "Status",
+        value: (event: Record<string, unknown>) => asString(event.status),
+      },
+      {
+        key: "start",
+        label: "Start",
+        value: (event: Record<string, unknown>) => formatCalendarTime(asRecord(event.start)),
+      },
+      {
+        key: "end",
+        label: "End",
+        value: (event: Record<string, unknown>) => formatCalendarTime(asRecord(event.end)),
+      },
+      {
+        key: "organizer",
+        label: "Organizer",
+        value: (event: Record<string, unknown>) =>
+          asString(asRecord(event.organizer)?.email) ??
+          asString(asRecord(event.creator)?.email),
+      },
+      {
+        key: "attendees",
+        label: "Attendees",
+        value: (event: Record<string, unknown>) => {
+          const count = asRecordArray(event.attendees)?.length;
+          return count !== undefined ? String(count) : undefined;
+        },
+      },
+      {
+        key: "location",
+        label: "Location",
+        value: (event: Record<string, unknown>) => asString(event.location),
+      },
+    ],
+    result.display.fields
+  );
 
   events.forEach((event, index) => {
     const id = asString(event.id) ?? "unknown";
@@ -140,6 +284,19 @@ function renderEventListSummary(
       "unknown";
     const attendeeCount = asRecordArray(event.attendees)?.length;
     const location = asString(event.location);
+
+    if (result.display.idsOnly) {
+      lines.push(`${index + 1}. ${id}`);
+      return;
+    }
+
+    if (requestedFields) {
+      lines.push(`${index + 1}.`);
+      requestedFields.forEach(field => {
+        lines.push(`   ${field.label}: ${field.value(event) ?? "(empty)"}`);
+      });
+      return;
+    }
 
     lines.push(`${index + 1}. ${summary}`);
     lines.push(`   Event ID: ${id}`);
@@ -156,7 +313,7 @@ function renderEventListSummary(
   });
 
   lines.push("");
-  lines.push("Use --json for the full response.");
+  lines.push("Use --full for the standard text summary or --json for the full response.");
   lines.push("");
   return lines.join("\n");
 }
@@ -180,7 +337,7 @@ function renderFreeBusySummary(
 
   const lines = [
     `${result.toolkit.displayName} / ${result.action.cliName}`,
-    `Summary: ${entries.length} calendar${entries.length === 1 ? "" : "s"} in availability window`,
+    `Summary: ${entries.length} calendar${entries.length === 1 ? "" : "s"} in availability window${formatSummaryModeSuffix(result.display)}`,
   ];
 
   const timeMin = asString(data.timeMin);
@@ -190,10 +347,77 @@ function renderFreeBusySummary(
   }
   lines.push("");
 
+  const requestedFields = resolveRequestedSummaryFields(
+    [
+      {
+        key: "calendar-id",
+        aliases: ["id", "calendar"],
+        label: "Calendar",
+        value: (entry: { calendarId: string; calendar: Record<string, unknown> }) => entry.calendarId,
+      },
+      {
+        key: "busy-slots",
+        aliases: ["busy"],
+        label: "Busy slots",
+        value: (entry: { calendarId: string; calendar: Record<string, unknown> }) =>
+          String(asRecordArray(entry.calendar.busy)?.length ?? 0),
+      },
+      {
+        key: "free-slots",
+        aliases: ["free"],
+        label: "Free slots",
+        value: (entry: { calendarId: string; calendar: Record<string, unknown> }) =>
+          String(asRecordArray(entry.calendar.free)?.length ?? 0),
+      },
+      {
+        key: "reliable",
+        label: "Reliable",
+        value: (entry: { calendarId: string; calendar: Record<string, unknown> }) => {
+          const isReliable = asBoolean(entry.calendar.is_reliable);
+          return isReliable === undefined ? "yes" : isReliable ? "yes" : "no";
+        },
+      },
+      {
+        key: "first-free",
+        label: "First free",
+        value: (entry: { calendarId: string; calendar: Record<string, unknown> }) => {
+          const firstFree = asRecord((asRecordArray(entry.calendar.free) ?? [])[0]);
+          return firstFree
+            ? `${asString(firstFree.start) ?? "unknown"} -> ${asString(firstFree.end) ?? "unknown"}`
+            : undefined;
+        },
+      },
+      {
+        key: "first-busy",
+        label: "First busy",
+        value: (entry: { calendarId: string; calendar: Record<string, unknown> }) => {
+          const firstBusy = asRecord((asRecordArray(entry.calendar.busy) ?? [])[0]);
+          return firstBusy
+            ? `${asString(firstBusy.start) ?? "unknown"} -> ${asString(firstBusy.end) ?? "unknown"}`
+            : undefined;
+        },
+      },
+    ],
+    result.display.fields
+  );
+
   entries.forEach(([calendarId, calendar], index) => {
     const busy = asRecordArray(calendar.busy) ?? [];
     const free = asRecordArray(calendar.free) ?? [];
     const isReliable = asBoolean(calendar.is_reliable);
+
+    if (result.display.idsOnly) {
+      lines.push(`${index + 1}. ${calendarId}`);
+      return;
+    }
+
+    if (requestedFields) {
+      lines.push(`${index + 1}.`);
+      requestedFields.forEach(field => {
+        lines.push(`   ${field.label}: ${field.value({ calendarId, calendar }) ?? "(empty)"}`);
+      });
+      return;
+    }
 
     lines.push(`${index + 1}. ${calendarId}`);
     lines.push(`   Busy slots: ${busy.length}`);
@@ -220,7 +444,7 @@ function renderFreeBusySummary(
   });
 
   lines.push("");
-  lines.push("Use --json for the full response.");
+  lines.push("Use --full for the standard text summary or --json for the full response.");
   lines.push("");
   return lines.join("\n");
 }
@@ -230,7 +454,7 @@ function renderEmptySummary(result: ToolkitSummaryRenderInput, message: string):
     `${result.toolkit.displayName} / ${result.action.cliName}`,
     message,
     "",
-    "Use --json for the full response.",
+    "Use --full for the standard text summary or --json for the full response.",
     "",
   ].join("\n");
 }

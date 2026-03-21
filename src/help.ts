@@ -1,11 +1,14 @@
 import { API_KEY_ENV, CLI_NAME, DEFAULT_USER_ID, TOOLKIT_PREVIEW_LIMIT } from "./constants.js";
+import { classifyCliError } from "./errors.js";
 import type {
+  CliDisplayOptions,
   ConnectedAccountSummary,
   ExecuteActionResult,
   JsonSchemaObject,
   JsonSchemaProperty,
   ToolkitAction,
 } from "./types.js";
+import { getDisplayActionAliases } from "./toolkits/actions.js";
 import { hasSummaryDefault, renderSummarizedExecutionResult } from "./toolkits/output.js";
 import type { ToolkitDefinition } from "./toolkits/shared.js";
 import { indent, pluralize, titleCaseWords, toFlagName, truncate } from "./utils/strings.js";
@@ -39,6 +42,7 @@ export function renderRootHelp(options: {
     `  3. Inspect one action:        ${CLI_NAME} <toolkit> inspect <action> --api-key <key>`,
     `  4. Run it with flags:         ${CLI_NAME} <toolkit> <action> --flag value --api-key <key>`,
     `  5. Run it with JSON:          ${CLI_NAME} <toolkit> <action> --input '{"key":"value"}' --api-key <key>`,
+    `  6. Trim text output:          ${CLI_NAME} <toolkit> <action> --fields id,summary --api-key <key>`,
     "",
     ...(options.hasApiKey
       ? enabledToolkits.length > 0
@@ -82,6 +86,7 @@ export function renderToolkitGuide(toolkit: ToolkitDefinition, actions?: Toolkit
     `  3. Run it with flags:     ${CLI_NAME} ${toolkit.cliName} <action> --flag value`,
     `  4. Run it with JSON:      ${CLI_NAME} ${toolkit.cliName} <action> --input '{"key":"value"}'`,
     `  5. Pipe JSON from stdin:  echo '{"key":"value"}' | ${CLI_NAME} ${toolkit.cliName} <action>`,
+    `  6. Trim text output:      ${CLI_NAME} ${toolkit.cliName} <action> --fields id,summary`,
     "",
     "Suggested starting actions:",
     ...toolkit.examples.map(example => `  ${CLI_NAME} ${toolkit.cliName} inspect ${example}`),
@@ -119,18 +124,26 @@ export function renderActionList(toolkit: ToolkitDefinition, actions: ToolkitAct
   return lines.join("\n");
 }
 
-export function renderActionGuide(toolkit: ToolkitDefinition, action: ToolkitAction): string {
+export function renderActionGuide(
+  toolkit: ToolkitDefinition,
+  action: ToolkitAction,
+  options: {
+    allParameters?: boolean;
+  } = {}
+): string {
   const inputSchema = action.inputSchema;
   const required = inputSchema?.required ?? [];
-  const propertyLines = renderSchemaProperties(inputSchema);
+  const propertyDisplay = renderSchemaProperties(inputSchema, {
+    allParameters: options.allParameters ?? false,
+  });
   const exampleFlags = buildExampleFlags(inputSchema);
   const exampleJson = buildExampleJson(inputSchema);
+  const aliases = getDisplayActionAliases(action);
 
   const lines = [
     `${toolkit.displayName} / ${action.cliName}`,
-    `Slug: ${action.slug}`,
     action.description ? `Description: ${action.description}` : undefined,
-    action.version ? `Pinned version: ${action.version}` : "Pinned version: latest available at runtime",
+    aliases.length > 0 ? `Also accepts: ${aliases.join(", ")}` : undefined,
     "",
     "How to run:",
     exampleFlags
@@ -144,13 +157,19 @@ export function renderActionGuide(toolkit: ToolkitDefinition, action: ToolkitAct
     "Input options:",
     `  --input <json>          Pass the full tool input as a JSON object.`,
     `  --set key=value         Patch one field at a time. Supports dots and [index] paths.`,
-    `  --tool-version <id>     Override the discovered tool version for this call.`,
-    ...propertyLines,
+    ...propertyDisplay.lines,
+    propertyDisplay.hiddenSummary ? `  ${propertyDisplay.hiddenSummary}` : undefined,
     "",
     hasSummaryDefault(toolkit, action)
       ? `Default text output is summarized for this ${toolkit.displayName} action. Use --json for the full response.`
       : undefined,
-    hasSummaryDefault(toolkit, action) ? "" : undefined,
+    hasSummaryDefault(toolkit, action)
+      ? "Output controls: --fields a,b, --ids-only, --full, --json"
+      : "Output controls: --json",
+    propertyDisplay.hiddenSummary && !(options.allParameters ?? false)
+      ? "Use --all-parameters to show every optional input field."
+      : undefined,
+    "",
     required.length > 0
       ? `Required top-level fields: ${required.join(", ")}`
       : "Required top-level fields: none",
@@ -173,9 +192,7 @@ export function renderConnections(
         "",
         ...(options.enabledToolkits ?? []).map(toolkit => {
           const account = accounts.find(item => item.toolkitSlug === toolkit.apiSlug && !item.isDisabled);
-          return `  ${toolkit.cliName.padEnd(20)}${
-            account ? `connected (${account.id})` : "not connected"
-          }`;
+          return `  ${toolkit.cliName.padEnd(20)}${account ? "connected" : "not connected"}`;
         }),
       ]
     : [
@@ -184,7 +201,7 @@ export function renderConnections(
         ...(accounts.length > 0
           ? accounts.map(
               account =>
-                `  ${String(account.userId ?? "unknown").padEnd(18)}${account.toolkitSlug.padEnd(20)}${account.status ?? "UNKNOWN"} ${account.id}`
+                `  ${String(account.userId ?? "unknown").padEnd(18)}${account.toolkitSlug.padEnd(20)}${account.status ?? "UNKNOWN"}`
             )
           : ["  No connected accounts found."]),
       ];
@@ -196,55 +213,123 @@ export function renderExecutionResult(result: {
   action: ToolkitAction;
   toolkit: ToolkitDefinition;
   execution: ExecuteActionResult;
+  display: CliDisplayOptions;
 }): string {
-  const { action, toolkit, execution } = result;
-  const summarized = renderSummarizedExecutionResult({
-    action,
-    toolkit,
-    execution: result.execution,
-  });
-  if (summarized) {
-    return summarized;
+  const { action, toolkit, execution, display } = result;
+  if (!display.full) {
+    const summarized = renderSummarizedExecutionResult({
+      action,
+      toolkit,
+      execution: result.execution,
+      display,
+    });
+    if (summarized) {
+      return summarized;
+    }
+  }
+
+  if (!execution.successful) {
+    const errorInfo = execution.errorInfo ?? classifyCliError(execution.error ?? "Action execution failed.");
+    return [
+      `${toolkit.displayName} / ${action.cliName}`,
+      `Error: ${errorInfo.message}`,
+      `Error type: ${errorInfo.kind}`,
+      execution.data !== undefined && execution.data !== null
+        ? `\nData:\n${indent(JSON.stringify(execution.data, null, 2), 2)}`
+        : undefined,
+      "",
+    ]
+      .filter((line): line is string => line !== undefined)
+      .join("\n");
   }
 
   return [
     `${toolkit.displayName} / ${action.cliName}`,
-    `Slug: ${action.slug}`,
-    `Successful: ${execution.successful ? "yes" : "no"}`,
-    execution.version ? `Version: ${execution.version}` : undefined,
-    execution.logId ? `Log ID: ${execution.logId}` : undefined,
-    "",
     "Data:",
     indent(JSON.stringify(execution.data === undefined ? null : execution.data, null, 2), 2),
-    execution.error ? `\nError: ${execution.error}` : undefined,
     "",
-  ]
-    .filter((line): line is string => line !== undefined)
-    .join("\n");
+  ].join("\n");
 }
 
-function renderSchemaProperties(schema?: JsonSchemaObject): string[] {
+function renderSchemaProperties(
+  schema: JsonSchemaObject | undefined,
+  options: {
+    allParameters: boolean;
+  }
+): {
+  lines: string[];
+  hiddenSummary?: string;
+} {
   const properties = schema?.properties ?? {};
   const required = new Set(schema?.required ?? []);
   const keys = Object.keys(properties).sort();
 
   if (keys.length === 0) {
-    return ["  This tool does not expose any top-level input fields."];
+    return {
+      lines: ["  This tool does not expose any top-level input fields."],
+    };
   }
 
-  return keys.map(key => {
-    const property = properties[key]!;
-    const flagName = `--${toFlagName(key)}`;
-    const descriptor = [
-      propertyTypeLabel(property),
-      required.has(key) ? "required" : "optional",
-      property.default !== undefined ? `default=${JSON.stringify(property.default)}` : undefined,
-    ]
-      .filter(Boolean)
-      .join(", ");
-    const description = property.description ? truncate(property.description, 80) : "No description.";
-    return `  ${flagName.padEnd(22)}${descriptor} — ${description}`;
+  const { visibleKeys, hiddenKeys } = selectDisplayPropertyKeys(keys, required, options.allParameters);
+  return {
+    lines: visibleKeys.map(key => {
+      const property = properties[key]!;
+      const flagName = `--${toFlagName(key)}`;
+      const descriptor = [
+        propertyTypeLabel(property),
+        required.has(key) ? "required" : "optional",
+        property.default !== undefined ? `default=${JSON.stringify(property.default)}` : undefined,
+      ]
+        .filter(Boolean)
+        .join(", ");
+      const description = property.description ? truncate(property.description, 80) : "No description.";
+      return `  ${flagName.padEnd(22)}${descriptor} — ${description}`;
+    }),
+    ...(hiddenKeys.length > 0
+      ? {
+          hiddenSummary: `Optional input fields hidden (${hiddenKeys.length}): ${hiddenKeys
+            .slice(0, 5)
+            .map(key => `--${toFlagName(key)}`)
+            .join(", ")}${hiddenKeys.length > 5 ? ", ..." : ""}.`,
+        }
+      : {}),
+  };
+}
+
+function selectDisplayPropertyKeys(
+  keys: string[],
+  required: Set<string>,
+  allParameters: boolean
+): {
+  visibleKeys: string[];
+  hiddenKeys: string[];
+} {
+  const minimumVisible = 5;
+  if (allParameters || keys.length <= minimumVisible) {
+    return {
+      visibleKeys: keys,
+      hiddenKeys: [],
+    };
+  }
+
+  const included = new Set<string>();
+  keys.forEach(key => {
+    if (required.has(key)) {
+      included.add(key);
+    }
   });
+
+  for (const key of keys) {
+    if (included.size >= minimumVisible) {
+      break;
+    }
+    included.add(key);
+  }
+
+  return {
+    visibleKeys: keys.filter(key => included.has(key)),
+    hiddenKeys: keys.filter(key => !included.has(key)),
+  };
 }
 
 function buildExampleFlags(schema?: JsonSchemaObject): string {
@@ -315,24 +400,31 @@ function propertyTypeLabel(property: JsonSchemaProperty | undefined): string {
 }
 
 function formatActionRow(action: ToolkitAction): string {
-  const suffix = action.description ? truncate(action.description, 70) : action.slug;
+  const suffix = action.description ? truncate(action.description, 70) : truncate(action.name, 70);
   const deprecated = action.isDeprecated ? " [deprecated]" : "";
-  return formatRow(action.cliName, `${action.slug}${deprecated} — ${suffix}`, 24);
+  return formatRow(action.cliName, `${suffix}${deprecated}`, 24);
 }
 
 function formatRow(left: string, right: string, width: number): string {
   return `${left.padEnd(width)}${right}`;
 }
 
-export function renderUnknownToolkit(token: string, enabledToolkits: ToolkitDefinition[]): string {
+export function renderUnknownToolkit(
+  token: string,
+  enabledToolkits: ToolkitDefinition[],
+  suggestion?: string
+): string {
   const suggestions = enabledToolkits.map(toolkit => toolkit.cliName).join(", ");
   return [
     `Unknown toolkit '${token}'.`,
+    suggestion ? `Did you mean '${suggestion}'?` : undefined,
     suggestions.length > 0
       ? `Enabled toolkits for this user: ${suggestions}`
       : `No enabled toolkits are currently available for this user.`,
     "",
-  ].join("\n");
+  ]
+    .filter((line): line is string => line !== undefined)
+    .join("\n");
 }
 
 export function renderDisabledToolkit(
@@ -351,14 +443,22 @@ export function renderDisabledToolkit(
   ].join("\n");
 }
 
-export function renderUnknownAction(toolkit: ToolkitDefinition, token: string, actions: ToolkitAction[]): string {
+export function renderUnknownAction(
+  toolkit: ToolkitDefinition,
+  token: string,
+  actions: ToolkitAction[],
+  suggestion?: string
+): string {
   const actionNames = actions.slice(0, 12).map(action => action.cliName).join(", ");
   return [
     `Unknown action '${token}' for ${toolkit.displayName}.`,
+    suggestion ? `Did you mean '${suggestion}'?` : undefined,
     `Run '${CLI_NAME} ${toolkit.cliName} actions' to see every action.`,
     actionNames.length > 0 ? `Examples: ${actionNames}` : "No actions were returned for this toolkit.",
     "",
-  ].join("\n");
+  ]
+    .filter((line): line is string => line !== undefined)
+    .join("\n");
 }
 
 export function renderMissingApiKey(): string {
@@ -377,10 +477,6 @@ export function renderInputError(message: string, toolkit: ToolkitDefinition, ac
       : `Run '${CLI_NAME} ${toolkit.cliName}' for toolkit-specific guidance.`,
     "",
   ].join("\n");
-}
-
-export function renderRuntimeError(message: string): string {
-  return [`Error: ${message}`, ""].join("\n");
 }
 
 export function renderVersion(version: string): string {

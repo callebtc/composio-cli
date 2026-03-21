@@ -11,6 +11,9 @@ Agent-first TypeScript CLI for Composio.
 - Uses `GET /api/v3/connected_accounts` to shrink the visible CLI surface to toolkits that actually have an active connected account.
 - Disables toolkit commands when no active connected account exists for the effective user.
 - Prints guide-style help inspired by `mcporter`.
+- Hides low-signal metadata in text mode and keeps full fidelity in `--json`.
+- Supports aliases and typo-tolerant action lookup, such as `list-events` for `events-list`.
+- Defaults large read actions to compact summaries, with `--fields`, `--ids-only`, and `--full` controls.
 
 ## Quick start
 
@@ -35,17 +38,36 @@ node dist/cli.js gmail actions --api-key "$COMPOSIO_API_KEY"
 # 4. Inspect one action
 node dist/cli.js gmail inspect fetch-emails --api-key "$COMPOSIO_API_KEY"
 
-# 5. Execute it with flags
+# 5. Show every optional input field if needed
+node dist/cli.js gmail inspect fetch-emails --api-key "$COMPOSIO_API_KEY" --all-parameters
+
+# 6. Execute it with flags
 node dist/cli.js gmail fetch-emails --api-key "$COMPOSIO_API_KEY" --max-results 5
 
-# 6. Ask for the full response instead of the default summary
+# 7. Keep the summary, but trim it further for agents
+node dist/cli.js gmail fetch-emails --api-key "$COMPOSIO_API_KEY" --max-results 5 --fields subject,date
+
+# 8. Return only IDs from a summary-capable action
+node dist/cli.js gmail fetch-emails --api-key "$COMPOSIO_API_KEY" --max-results 5 --ids-only
+
+# 9. Ask for the full text payload instead of the default summary
+node dist/cli.js gmail fetch-emails --api-key "$COMPOSIO_API_KEY" --max-results 5 --full
+
+# 10. Ask for the full JSON response
 node dist/cli.js gmail fetch-emails --api-key "$COMPOSIO_API_KEY" --max-results 5 --json
 
-# 7. Execute it with JSON
+# 11. Execute it with JSON
 node dist/cli.js gmail fetch-emails --api-key "$COMPOSIO_API_KEY" --input '{"query":"from:billing"}'
 ```
 
-Large Gmail read commands default to a compact text summary. For example, `fetch-emails` shows the message ID, sender, subject, date, labels, and a preview capped at 100 characters. Use `--json` when the agent needs the full payload.
+Large read commands default to a compact text summary. For example, Gmail `fetch-emails` shows the message ID, sender, subject, date, labels, and a preview capped at 100 characters.
+
+Use these output modes on summary-capable actions:
+
+- `--fields subject,date` to keep only the listed fields in text mode
+- `--ids-only` to print only item identifiers
+- `--full` to bypass the summary and print the full text payload
+- `--json` to return the full machine-readable response
 
 ## Development
 

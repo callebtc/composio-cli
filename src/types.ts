@@ -28,6 +28,29 @@ export interface JsonSchemaObject extends JsonSchemaProperty {
   required?: string[];
 }
 
+export type CliErrorKind =
+  | "auth"
+  | "no_connection"
+  | "validation"
+  | "permission"
+  | "rate_limit"
+  | "server";
+
+export interface CliErrorInfo {
+  kind: CliErrorKind;
+  message: string;
+  statusCode?: number | undefined;
+  suggestion?: string | undefined;
+  rawMessage?: string | undefined;
+}
+
+export interface CliDisplayOptions {
+  allParameters: boolean;
+  full: boolean;
+  idsOnly: boolean;
+  fields?: string[] | undefined;
+}
+
 export interface ToolkitAction {
   slug: string;
   name: string;
@@ -54,6 +77,7 @@ export interface ExecuteActionResult {
   successful: boolean;
   data: unknown;
   error?: string | null | undefined;
+  errorInfo?: CliErrorInfo | undefined;
   logId?: string | undefined;
   sessionInfo?: unknown;
   toolSlug: string;

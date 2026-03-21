@@ -1,10 +1,11 @@
-import type { ExecuteActionResult, ToolkitAction } from "../types.js";
+import type { CliDisplayOptions, ExecuteActionResult, ToolkitAction } from "../types.js";
 import { unique } from "../utils/strings.js";
 
 export interface ToolkitSummaryRenderInput {
   action: ToolkitAction;
   toolkit: ToolkitDefinition;
   execution: ExecuteActionResult;
+  display: CliDisplayOptions;
 }
 
 export interface ToolkitOutputSummary {

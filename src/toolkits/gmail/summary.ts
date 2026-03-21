@@ -1,5 +1,7 @@
 import { CLI_NAME } from "../../constants.js";
 import type { ToolkitAction } from "../../types.js";
+import { buildReplayCommand, findInputProperty } from "../follow-up.js";
+import { formatSummaryModeSuffix, resolveRequestedSummaryFields } from "../summary-fields.js";
 import type { ToolkitOutputSummary, ToolkitSummaryRenderInput } from "../shared.js";
 import { truncate } from "../../utils/strings.js";
 
@@ -62,7 +64,7 @@ function renderGmailMessagesSummary(
 
   const lines = [
     `${result.toolkit.displayName} / ${result.action.cliName}`,
-    `Summary: ${messages.length} message${messages.length === 1 ? "" : "s"}`,
+    `Summary: ${messages.length} message${messages.length === 1 ? "" : "s"}${formatSummaryModeSuffix(result.display)}`,
   ];
 
   const resultSizeEstimate = asNumber(data.resultSizeEstimate);
@@ -72,8 +74,81 @@ function renderGmailMessagesSummary(
   const nextPageToken = asString(data.nextPageToken);
   if (nextPageToken) {
     lines.push(`Next page token: ${nextPageToken}`);
+    const pageTokenKey = findInputProperty(result.action.inputSchema, [
+      "page_token",
+      "pageToken",
+      "next_page_token",
+      "nextPageToken",
+    ]);
+    if (pageTokenKey) {
+      lines.push(
+        `Next page: ${buildReplayCommand(result, {
+          [pageTokenKey]: nextPageToken,
+        })}`
+      );
+    }
   }
   lines.push("");
+
+  const requestedFields = resolveRequestedSummaryFields(
+    [
+      {
+        key: "message-id",
+        aliases: ["id", "messageId", "message_id"],
+        label: "Message ID",
+        value: (message: Record<string, unknown>) => asString(message.messageId) ?? asString(message.id),
+      },
+      {
+        key: "sender",
+        aliases: ["from"],
+        label: "From",
+        value: (message: Record<string, unknown>) =>
+          asString(message.sender) ?? getHeader(message, "From"),
+      },
+      {
+        key: "subject",
+        label: "Subject",
+        value: (message: Record<string, unknown>) =>
+          asString(message.subject) ??
+          asString(asRecord(message.preview)?.subject) ??
+          getHeader(message, "Subject"),
+      },
+      {
+        key: "date",
+        aliases: ["timestamp"],
+        label: "Date",
+        value: (message: Record<string, unknown>) =>
+          asString(message.messageTimestamp) ??
+          asString(message.internalDate) ??
+          getHeader(message, "Date"),
+      },
+      {
+        key: "labels",
+        aliases: ["label-ids"],
+        label: "Labels",
+        value: (message: Record<string, unknown>) => {
+          const labels = asStringArray(message.labelIds);
+          return labels.length > 0 ? labels.join(", ") : "(none)";
+        },
+      },
+      {
+        key: "preview",
+        aliases: ["snippet"],
+        label: "Preview",
+        value: (message: Record<string, unknown>) =>
+          truncate(
+            normalizePreview(
+              asString(asRecord(message.preview)?.body) ??
+                asString(message.snippet) ??
+                asString(message.messageText) ??
+                ""
+            ),
+            100
+          ) || "(empty)",
+      },
+    ],
+    result.display.fields
+  );
 
   messages.forEach((message, index) => {
     const messageId = asString(message.messageId) ?? asString(message.id) ?? "unknown";
@@ -96,6 +171,19 @@ function renderGmailMessagesSummary(
       "";
     const preview = truncate(normalizePreview(previewSource), 100);
 
+    if (result.display.idsOnly) {
+      lines.push(`${index + 1}. ${messageId}`);
+      return;
+    }
+
+    if (requestedFields) {
+      lines.push(`${index + 1}.`);
+      requestedFields.forEach(field => {
+        lines.push(`   ${field.label}: ${field.value(message) ?? "(empty)"}`);
+      });
+      return;
+    }
+
     lines.push(`${index + 1}. ${messageId}`);
     lines.push(`   From: ${sender}`);
     lines.push(`   Subject: ${subject}`);
@@ -105,7 +193,7 @@ function renderGmailMessagesSummary(
   });
 
   lines.push("");
-  lines.push("Use --json for the full response.");
+  lines.push("Use --full for the standard text summary or --json for the full response.");
   lines.push(
     `Read one full message: ${CLI_NAME} gmail fetch-message-by-message-id --message-id ${asString(messages[0]?.messageId) ?? "<message-id>"} --api-key <key> --json`
   );
@@ -127,9 +215,53 @@ function renderGmailThreadsSummary(
 
   const lines = [
     `${result.toolkit.displayName} / ${result.action.cliName}`,
-    `Summary: ${threads.length} thread${threads.length === 1 ? "" : "s"}`,
+    `Summary: ${threads.length} thread${threads.length === 1 ? "" : "s"}${formatSummaryModeSuffix(result.display)}`,
     "",
   ];
+
+  const requestedFields = resolveRequestedSummaryFields(
+    [
+      {
+        key: "thread-id",
+        aliases: ["id"],
+        label: "Thread ID",
+        value: (thread: Record<string, unknown>) => asString(thread.threadId) ?? asString(thread.id),
+      },
+      {
+        key: "subject",
+        label: "Subject",
+        value: (thread: Record<string, unknown>) =>
+          asString(thread.subject) ??
+          asString(asRecord(thread.preview)?.subject) ??
+          firstNestedMessageSubject(thread),
+      },
+      {
+        key: "messages",
+        aliases: ["message-count"],
+        label: "Messages",
+        value: (thread: Record<string, unknown>) => {
+          const count = asRecordArray(thread.messages)?.length;
+          return count !== undefined ? String(count) : undefined;
+        },
+      },
+      {
+        key: "preview",
+        aliases: ["snippet"],
+        label: "Preview",
+        value: (thread: Record<string, unknown>) =>
+          truncate(
+            normalizePreview(
+              asString(thread.snippet) ??
+                asString(asRecord(thread.preview)?.body) ??
+                firstNestedMessagePreview(thread) ??
+                ""
+            ),
+            100
+          ) || "(empty)",
+      },
+    ],
+    result.display.fields
+  );
 
   threads.forEach((thread, index) => {
     const threadId = asString(thread.threadId) ?? asString(thread.id) ?? "unknown";
@@ -145,6 +277,19 @@ function renderGmailThreadsSummary(
       "";
     const messageCount = asRecordArray(thread.messages)?.length;
 
+    if (result.display.idsOnly) {
+      lines.push(`${index + 1}. ${threadId}`);
+      return;
+    }
+
+    if (requestedFields) {
+      lines.push(`${index + 1}.`);
+      requestedFields.forEach(field => {
+        lines.push(`   ${field.label}: ${field.value(thread) ?? "(empty)"}`);
+      });
+      return;
+    }
+
     lines.push(`${index + 1}. ${threadId}`);
     lines.push(`   Subject: ${subject}`);
     if (messageCount !== undefined) {
@@ -154,7 +299,7 @@ function renderGmailThreadsSummary(
   });
 
   lines.push("");
-  lines.push("Use --json for the full response.");
+  lines.push("Use --full for the standard text summary or --json for the full response.");
   lines.push(
     `Read one full thread: ${CLI_NAME} gmail fetch-message-by-thread-id --thread-id ${asString(threads[0]?.threadId) ?? asString(threads[0]?.id) ?? "<thread-id>"} --api-key <key> --json`
   );
@@ -176,9 +321,59 @@ function renderGmailDraftsSummary(
 
   const lines = [
     `${result.toolkit.displayName} / ${result.action.cliName}`,
-    `Summary: ${drafts.length} draft${drafts.length === 1 ? "" : "s"}`,
+    `Summary: ${drafts.length} draft${drafts.length === 1 ? "" : "s"}${formatSummaryModeSuffix(result.display)}`,
     "",
   ];
+
+  const requestedFields = resolveRequestedSummaryFields(
+    [
+      {
+        key: "draft-id",
+        aliases: ["id"],
+        label: "Draft ID",
+        value: (draft: Record<string, unknown>) => asString(draft.id),
+      },
+      {
+        key: "to",
+        label: "To",
+        value: (draft: Record<string, unknown>) => {
+          const message = asRecord(draft.message) ?? draft;
+          return asString(message.to) ?? getHeader(message, "To");
+        },
+      },
+      {
+        key: "subject",
+        label: "Subject",
+        value: (draft: Record<string, unknown>) => {
+          const message = asRecord(draft.message) ?? draft;
+          return (
+            asString(message.subject) ??
+            getHeader(message, "Subject") ??
+            asString(asRecord(message.preview)?.subject)
+          );
+        },
+      },
+      {
+        key: "preview",
+        label: "Preview",
+        value: (draft: Record<string, unknown>) => {
+          const message = asRecord(draft.message) ?? draft;
+          return (
+            truncate(
+              normalizePreview(
+                asString(asRecord(message.preview)?.body) ??
+                  asString(message.snippet) ??
+                  asString(message.messageText) ??
+                  ""
+              ),
+              100
+            ) || "(empty)"
+          );
+        },
+      },
+    ],
+    result.display.fields
+  );
 
   drafts.forEach((draft, index) => {
     const message = asRecord(draft.message) ?? draft;
@@ -195,6 +390,19 @@ function renderGmailDraftsSummary(
       asString(message.messageText) ??
       "";
 
+    if (result.display.idsOnly) {
+      lines.push(`${index + 1}. ${draftId}`);
+      return;
+    }
+
+    if (requestedFields) {
+      lines.push(`${index + 1}.`);
+      requestedFields.forEach(field => {
+        lines.push(`   ${field.label}: ${field.value(draft) ?? "(empty)"}`);
+      });
+      return;
+    }
+
     lines.push(`${index + 1}. ${draftId}`);
     lines.push(`   To: ${to}`);
     lines.push(`   Subject: ${subject}`);
@@ -202,7 +410,7 @@ function renderGmailDraftsSummary(
   });
 
   lines.push("");
-  lines.push("Use --json for the full response.");
+  lines.push("Use --full for the standard text summary or --json for the full response.");
   lines.push("");
   return lines.join("\n");
 }
@@ -221,20 +429,56 @@ function renderGmailLabelsSummary(
 
   const lines = [
     `${result.toolkit.displayName} / ${result.action.cliName}`,
-    `Summary: ${labels.length} label${labels.length === 1 ? "" : "s"}`,
+    `Summary: ${labels.length} label${labels.length === 1 ? "" : "s"}${formatSummaryModeSuffix(result.display)}`,
     "",
   ];
+
+  const requestedFields = resolveRequestedSummaryFields(
+    [
+      {
+        key: "label-id",
+        aliases: ["id"],
+        label: "Label ID",
+        value: (label: Record<string, unknown>) => asString(label.id),
+      },
+      {
+        key: "name",
+        label: "Name",
+        value: (label: Record<string, unknown>) => asString(label.name),
+      },
+      {
+        key: "type",
+        label: "Type",
+        value: (label: Record<string, unknown>) => asString(label.type),
+      },
+    ],
+    result.display.fields
+  );
 
   labels.forEach((label, index) => {
     const id = asString(label.id) ?? "unknown";
     const name = asString(label.name) ?? "(unnamed)";
     const type = asString(label.type) ?? "unknown";
+
+    if (result.display.idsOnly) {
+      lines.push(`${index + 1}. ${id}`);
+      return;
+    }
+
+    if (requestedFields) {
+      lines.push(`${index + 1}.`);
+      requestedFields.forEach(field => {
+        lines.push(`   ${field.label}: ${field.value(label) ?? "(empty)"}`);
+      });
+      return;
+    }
+
     lines.push(`${index + 1}. ${name} (${id})`);
     lines.push(`   Type: ${type}`);
   });
 
   lines.push("");
-  lines.push("Use --json for the full response.");
+  lines.push("Use --full for the standard text summary or --json for the full response.");
   lines.push("");
   return lines.join("\n");
 }
@@ -253,9 +497,32 @@ function renderGmailPeopleSummary(
 
   const lines = [
     `${result.toolkit.displayName} / ${result.action.cliName}`,
-    `Summary: ${people.length} contact${people.length === 1 ? "" : "s"}`,
+    `Summary: ${people.length} contact${people.length === 1 ? "" : "s"}${formatSummaryModeSuffix(result.display)}`,
     "",
   ];
+
+  const requestedFields = resolveRequestedSummaryFields(
+    [
+      {
+        key: "name",
+        label: "Name",
+        value: (person: Record<string, unknown>) =>
+          asString(person.name) ??
+          asString(person.displayName) ??
+          asString(firstArrayValue(person.names, "displayName")),
+      },
+      {
+        key: "email",
+        aliases: ["email-address"],
+        label: "Email",
+        value: (person: Record<string, unknown>) =>
+          asString(person.email) ??
+          asString(person.emailAddress) ??
+          asString(firstArrayValue(person.emailAddresses, "value")),
+      },
+    ],
+    result.display.fields
+  );
 
   people.forEach((person, index) => {
     const name =
@@ -268,12 +535,26 @@ function renderGmailPeopleSummary(
       asString(person.emailAddress) ??
       asString(firstArrayValue(person.emailAddresses, "value")) ??
       "(no email)";
+
+    if (result.display.idsOnly) {
+      lines.push(`${index + 1}. ${email}`);
+      return;
+    }
+
+    if (requestedFields) {
+      lines.push(`${index + 1}.`);
+      requestedFields.forEach(field => {
+        lines.push(`   ${field.label}: ${field.value(person) ?? "(empty)"}`);
+      });
+      return;
+    }
+
     lines.push(`${index + 1}. ${name}`);
     lines.push(`   Email: ${email}`);
   });
 
   lines.push("");
-  lines.push("Use --json for the full response.");
+  lines.push("Use --full for the standard text summary or --json for the full response.");
   lines.push("");
   return lines.join("\n");
 }
@@ -283,7 +564,7 @@ function renderEmptySummary(result: ToolkitSummaryRenderInput, message: string):
     `${result.toolkit.displayName} / ${result.action.cliName}`,
     message,
     "",
-    "Use --json for the full response.",
+    "Use --full for the standard text summary or --json for the full response.",
     "",
   ].join("\n");
 }

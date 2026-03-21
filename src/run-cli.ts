@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { API_KEY_ENV } from "./constants.js";
 import { createComposioGateway } from "./composio/gateway.js";
+import { buildCliErrorEnvelope, classifyCliError, renderCliError } from "./errors.js";
 import {
   renderActionGuide,
   renderActionList,
@@ -10,26 +11,60 @@ import {
   renderInputError,
   renderMissingApiKey,
   renderRootHelp,
-  renderRuntimeError,
   renderToolkitGuide,
   renderToolkitList,
   renderUnknownAction,
   renderUnknownToolkit,
   renderVersion,
 } from "./help.js";
-import { buildActionInput, parseSharedFlags } from "./input.js";
-import { resolveToolkitAction } from "./toolkits/actions.js";
+import { buildActionInput, parseSharedFlags, validateSharedFlags } from "./input.js";
+import { resolveToolkitActionSelection } from "./toolkits/actions.js";
 import { resolveToolkit, SUPPORTED_TOOLKITS } from "./toolkits/index.js";
+import { hasSummaryDefault } from "./toolkits/output.js";
 import type { ToolkitDefinition } from "./toolkits/shared.js";
 import type { CliRunOptions, CliRunResult, ComposioGateway } from "./types.js";
+import { chooseClosestIdentifier } from "./utils/identifiers.js";
 import { stringifyJson } from "./utils/json.js";
 
 export async function runCli(argv: string[], options: CliRunOptions = {}): Promise<CliRunResult> {
   const env = options.env ?? process.env;
-  const shared = parseSharedFlags(argv);
+  const jsonRequested = argv.includes("--json");
+  let shared: ReturnType<typeof parseSharedFlags>;
+  try {
+    shared = parseSharedFlags(argv);
+    validateSharedFlags(shared);
+  } catch (error) {
+    const classified = classifyCliError(error);
+    return jsonRequested
+      ? failJson(stringifyJson(buildCliErrorEnvelope(classified)))
+      : fail(renderCliError(classified));
+  }
   const machineOutput = shared.json;
   const remaining = shared.remainingTokens;
   const gatewayOrError = createGatewayFactory(shared.apiKey ?? env[API_KEY_ENV], shared.baseUrl, options);
+  const failWithError = (
+    error: unknown,
+    details: {
+      text?: string;
+      toolkit?: ToolkitDefinition;
+      action?: string;
+      suggestion?: string;
+    } = {}
+  ) => {
+    const classified = classifyCliError(error, {
+      ...(details.suggestion ? { suggestion: details.suggestion } : {}),
+    });
+    return machineOutput
+      ? failJson(
+          stringifyJson(
+            buildCliErrorEnvelope(classified, {
+              ...(details.toolkit ? { toolkit: details.toolkit.cliName } : {}),
+              ...(details.action ? { action: details.action } : {}),
+            })
+          )
+        )
+      : fail(details.text ?? renderCliError(classified));
+  };
 
   let enabledToolkitCache: ToolkitDefinition[] | undefined;
   let connectedAccountCache:
@@ -130,7 +165,9 @@ export async function runCli(argv: string[], options: CliRunOptions = {}): Promi
 
   if (command === "toolkits") {
     if (gatewayOrError.error) {
-      return fail(renderMissingApiKey());
+      return failWithError(gatewayOrError.error, {
+        text: renderMissingApiKey(),
+      });
     }
     try {
       const enabledToolkits = await getEnabledToolkits();
@@ -138,13 +175,15 @@ export async function runCli(argv: string[], options: CliRunOptions = {}): Promi
         ? ok(stringifyJson(enabledToolkits))
         : ok(renderToolkitList(enabledToolkits, await getEffectiveUserId()));
     } catch (error) {
-      return fail(renderRuntimeError(error instanceof Error ? error.message : String(error)));
+      return failWithError(error);
     }
   }
 
   if (command === "connections") {
     if (gatewayOrError.error) {
-      return fail(gatewayOrError.error);
+      return failWithError(gatewayOrError.error, {
+        text: renderMissingApiKey(),
+      });
     }
     try {
       const connections = await getConnectedAccounts(shared.userProvided ? "user" : "all");
@@ -160,23 +199,42 @@ export async function runCli(argv: string[], options: CliRunOptions = {}): Promi
             ...(shared.userProvided ? { enabledToolkits: await getEnabledToolkits() } : {}),
           }));
     } catch (error) {
-      return fail(renderRuntimeError(error instanceof Error ? error.message : String(error)));
+      return failWithError(error);
     }
   }
 
   const toolkit = resolveToolkit(command);
   if (!toolkit) {
-    return fail(renderUnknownToolkit(command, await getEnabledToolkits().catch(() => [])));
+    const enabledToolkits = await getEnabledToolkits().catch(() => []);
+    const toolkitSuggestion = chooseClosestIdentifier(
+      command,
+      enabledToolkits.map(entry => entry.cliName)
+    );
+    return failWithError(`Unknown toolkit '${command}'.`, {
+      text: renderUnknownToolkit(command, enabledToolkits, toolkitSuggestion?.value),
+      ...(toolkitSuggestion?.value
+        ? { suggestion: `Did you mean '${toolkitSuggestion.value}'?` }
+        : {}),
+    });
   }
 
   if (gatewayOrError.error) {
-    return fail(renderMissingApiKey());
+    return failWithError(gatewayOrError.error, {
+      text: renderMissingApiKey(),
+      toolkit,
+    });
   }
 
   const enabledToolkits = await getEnabledToolkits();
   const toolkitEnabled = enabledToolkits.some(entry => entry.apiSlug === toolkit.apiSlug);
   if (!toolkitEnabled) {
-    return fail(renderDisabledToolkit(toolkit, await getEffectiveUserId(), enabledToolkits));
+    return failWithError(
+      `Toolkit '${toolkit.cliName}' is disabled for user '${await getEffectiveUserId()}'.`,
+      {
+        text: renderDisabledToolkit(toolkit, await getEffectiveUserId(), enabledToolkits),
+        toolkit,
+      }
+    );
   }
   const commandOrAction = rest[0];
 
@@ -197,40 +255,88 @@ export async function runCli(argv: string[], options: CliRunOptions = {}): Promi
       );
       return machineOutput ? ok(stringifyJson(actions)) : ok(renderActionList(toolkit, actions));
     } catch (error) {
-      return fail(renderRuntimeError(error instanceof Error ? error.message : String(error)));
+      return failWithError(error);
     }
   }
 
   if (commandOrAction === "inspect") {
     const selector = rest[1];
     if (!selector) {
-      return fail(renderInputError("Missing action name after 'inspect'.", toolkit));
+      return failWithError("Missing action name after 'inspect'.", {
+        text: renderInputError("Missing action name after 'inspect'.", toolkit),
+        toolkit,
+      });
     }
     try {
       const actions = await gatewayOrError.gateway!.listToolkitActions(
         toolkit.apiSlug,
         toolkit.toolPrefix
       );
-      const action = resolveToolkitAction(actions, selector);
-      if (!action) {
-        return fail(renderUnknownAction(toolkit, selector, actions));
+      const selection = resolveToolkitActionSelection(actions, selector);
+      if (!selection.action) {
+        return failWithError(`Unknown action '${selector}' for ${toolkit.displayName}.`, {
+          text: renderUnknownAction(toolkit, selector, actions, selection.resolution?.value),
+          toolkit,
+          ...(selection.resolution?.value
+            ? { suggestion: `Did you mean '${selection.resolution.value}'?` }
+            : {}),
+        });
       }
-      return machineOutput ? ok(stringifyJson(action)) : ok(renderActionGuide(toolkit, action));
+      const notice =
+        selection.resolution?.kind === "auto"
+          ? `Auto-corrected action '${selector}' to '${selection.action.cliName}'.\n\n`
+          : "";
+      return machineOutput
+        ? ok(stringifyJson(selection.action))
+        : ok(
+            `${notice}${renderActionGuide(toolkit, selection.action, {
+              allParameters: shared.display.allParameters,
+            })}`
+          );
     } catch (error) {
-      return fail(renderRuntimeError(error instanceof Error ? error.message : String(error)));
+      return failWithError(error);
     }
   }
 
   try {
     const actions = await gatewayOrError.gateway!.listToolkitActions(toolkit.apiSlug, toolkit.toolPrefix);
-    const action = resolveToolkitAction(actions, commandOrAction);
-    if (!action) {
-      return fail(renderUnknownAction(toolkit, commandOrAction, actions));
+    const selection = resolveToolkitActionSelection(actions, commandOrAction);
+    if (!selection.action) {
+      return failWithError(`Unknown action '${commandOrAction}' for ${toolkit.displayName}.`, {
+        text: renderUnknownAction(toolkit, commandOrAction, actions, selection.resolution?.value),
+        toolkit,
+        ...(selection.resolution?.value
+          ? { suggestion: `Did you mean '${selection.resolution.value}'?` }
+          : {}),
+      });
     }
+    const action = selection.action;
 
     const actionTokens = rest.slice(1);
+    if ((shared.display.idsOnly || shared.display.fields) && !hasSummaryDefault(toolkit, action)) {
+      return failWithError(
+        `Action '${action.cliName}' does not support --fields or --ids-only.`,
+        {
+          text: renderInputError(
+            `Action '${action.cliName}' does not support --fields or --ids-only.`,
+            toolkit,
+            action
+          ),
+          toolkit,
+          action: action.cliName,
+        }
+      );
+    }
     if (shared.help) {
-      return ok(renderActionGuide(toolkit, action));
+      const notice =
+        selection.resolution?.kind === "auto"
+          ? `Auto-corrected action '${commandOrAction}' to '${action.cliName}'.\n\n`
+          : "";
+      return ok(
+        `${notice}${renderActionGuide(toolkit, action, {
+          allParameters: shared.display.allParameters,
+        })}`
+      );
     }
 
     let input: Record<string, unknown>;
@@ -243,13 +349,11 @@ export async function runCli(argv: string[], options: CliRunOptions = {}): Promi
         ...(shared.inputJson !== undefined ? { inputJson: shared.inputJson } : {}),
       });
     } catch (error) {
-      return fail(
-        renderInputError(
-          error instanceof Error ? error.message : String(error),
-          toolkit,
-          action
-        )
-      );
+      return failWithError(error, {
+        text: renderInputError(error instanceof Error ? error.message : String(error), toolkit, action),
+        toolkit,
+        action: action.cliName,
+      });
     }
 
     const execution = await gatewayOrError.gateway!.executeAction(action, {
@@ -261,10 +365,22 @@ export async function runCli(argv: string[], options: CliRunOptions = {}): Promi
     if (machineOutput) {
       return ok(stringifyJson(execution));
     }
-    return ok(renderExecutionResult({ toolkit, action, execution }));
+    const notice =
+      selection.resolution?.kind === "auto"
+        ? `Auto-corrected action '${commandOrAction}' to '${action.cliName}'.\n\n`
+        : "";
+    return ok(
+      `${notice}${renderExecutionResult({
+        toolkit,
+        action,
+        execution,
+        display: shared.display,
+      })}`
+    );
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    return fail(renderRuntimeError(message));
+    return failWithError(error, {
+      toolkit,
+    });
   }
 }
 
@@ -310,5 +426,13 @@ function fail(stderr: string): CliRunResult {
     exitCode: 1,
     stdout: "",
     stderr,
+  };
+}
+
+function failJson(stdout: string): CliRunResult {
+  return {
+    exitCode: 1,
+    stdout,
+    stderr: "",
   };
 }

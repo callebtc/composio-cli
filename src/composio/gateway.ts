@@ -1,6 +1,7 @@
 import { Composio, ComposioProvider } from "@composio/core";
 import type { Tool } from "@composio/core";
 import { MAX_ACTIONS_PER_TOOLKIT } from "../constants.js";
+import { classifyCliError } from "../errors.js";
 import { buildToolkitAction } from "../toolkits/actions.js";
 import type {
   ComposioGateway,
@@ -118,6 +119,7 @@ class RealComposioGateway implements ComposioGateway {
       successful: result.successful,
       data: result.data,
       error: result.error,
+      ...(result.error ? { errorInfo: classifyCliError(result.error) } : {}),
       logId: result.logId,
       sessionInfo: result.sessionInfo,
       toolSlug: action.slug,
