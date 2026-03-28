@@ -401,7 +401,7 @@ function createGatewayFactory(
   baseUrl: string | undefined,
   options: CliRunOptions
 ): { gateway?: ComposioGateway; error?: string } {
-  if (!apiKey) {
+  if (!apiKey?.trim()) {
     return { error: renderMissingApiKey() };
   }
 
@@ -410,6 +410,7 @@ function createGatewayFactory(
     gateway: factory({
       apiKey,
       ...(baseUrl !== undefined ? { baseUrl } : {}),
+      ...(options.env ? { env: options.env } : {}),
     }),
   };
 }

@@ -348,6 +348,43 @@ describe("runCli", () => {
     expect(result.stdout).not.toContain("github");
   });
 
+  it("passes the full environment through to the gateway factory", async () => {
+    const gateway = createFakeGateway({
+      actionsByToolkit: {
+        gmail: gmailActions,
+      },
+      connections: [{ id: "conn_1", toolkitSlug: "gmail", status: "ACTIVE", userId: "default" }],
+    });
+    let captured:
+      | {
+          apiKey: string;
+          baseUrl?: string | undefined;
+          env?: Record<string, string | undefined> | undefined;
+        }
+      | undefined;
+
+    const env = {
+      COMPOSIO_API_KEY: "cmpx_deadbeef.secret",
+      COMPOSIO_MCP_URL: "https://api.clawi.ai/api/deployments/dep-1/composio/mcp",
+      CLAWI_API_BASE: "https://api.clawi.ai",
+      CLAWI_DEPLOYMENT_ID: "dep-1",
+    };
+
+    const result = await runCli(["toolkits"], {
+      env,
+      gatewayFactory: options => {
+        captured = options;
+        return gateway.factory();
+      },
+    });
+
+    expect(result.exitCode).toBe(0);
+    expect(captured).toEqual({
+      apiKey: "cmpx_deadbeef.secret",
+      env,
+    });
+  });
+
   it("shows enabled connected toolkits even when they are not in the static registry", async () => {
     const gateway = createFakeGateway({
       actionsByToolkit: {

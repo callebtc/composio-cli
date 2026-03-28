@@ -41,12 +41,12 @@ export function renderRootHelp(options: {
     "Start here:",
     options.hasApiKey && enabledToolkits.length > 0
       ? `  1. Pick an enabled toolkit:  ${CLI_NAME} ${enabledToolkits[0]!.cliName}`
-      : `  1. Discover toolkits:        ${CLI_NAME} toolkits --api-key <key>`,
-    `  2. See live connections:      ${CLI_NAME} connections --api-key <key>`,
-    `  3. Inspect one action:        ${CLI_NAME} <toolkit> inspect <action> --api-key <key>`,
-    `  4. Run it with flags:         ${CLI_NAME} <toolkit> <action> --flag value --api-key <key>`,
-    `  5. Run it with JSON:          ${CLI_NAME} <toolkit> <action> --input '{"key":"value"}' --api-key <key>`,
-    `  6. Trim text output:          ${CLI_NAME} <toolkit> <action> --fields id,summary --api-key <key>`,
+      : `  1. Discover toolkits:        ${CLI_NAME} toolkits`,
+    `  2. See live connections:      ${CLI_NAME} connections`,
+    `  3. Inspect one action:        ${CLI_NAME} <toolkit> inspect <action>`,
+    `  4. Run it with flags:         ${CLI_NAME} <toolkit> <action> --flag value`,
+    `  5. Run it with JSON:          ${CLI_NAME} <toolkit> <action> --input '{"key":"value"}'`,
+    `  6. Trim text output:          ${CLI_NAME} <toolkit> <action> --fields id,summary`,
     "",
     ...(options.hasApiKey
       ? enabledToolkits.length > 0
@@ -56,10 +56,10 @@ export function renderRootHelp(options: {
           ]
         : [
             `No active connected toolkits were found for user '${options.userId ?? DEFAULT_USER_ID}'.`,
-            `Run '${CLI_NAME} connections --api-key <key>' to inspect available connected accounts and user IDs.`,
+            `Run '${CLI_NAME} connections' to inspect available connected accounts and user IDs.`,
           ]
       : [
-          `Run '${CLI_NAME} toolkits --api-key <key>' after authentication to show only connected toolkit commands.`,
+          `Run '${CLI_NAME} toolkits' after authentication to show only connected toolkit commands.`,
         ]),
     "",
   ].join("\n");
@@ -131,7 +131,7 @@ export function renderToolkitGuide(toolkit: ToolkitDefinition, actions?: Toolkit
     lines.push(`Run '${CLI_NAME} ${toolkit.cliName} actions' to see the full list.`);
   } else {
     lines.push("", "Live action preview:");
-    lines.push(`  Provide --api-key or set ${API_KEY_ENV} to fetch the current action list from Composio.`);
+    lines.push(`  Set ${API_KEY_ENV} to fetch the current action list from Composio.`);
   }
 
   lines.push("");
@@ -486,7 +486,7 @@ export function renderDisabledToolkit(
     enabled.length > 0
       ? `Enabled toolkits for this user: ${enabled}`
       : `No enabled toolkits are available for this user.`,
-    `Run '${CLI_NAME} connections --api-key <key>' to inspect connected accounts.`,
+    `Run '${CLI_NAME} connections' to inspect connected accounts.`,
     "",
   ].join("\n");
 }

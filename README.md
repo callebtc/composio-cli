@@ -4,11 +4,15 @@ Agent-first TypeScript CLI for Composio.
 
 ## What this CLI does
 
-- Uses the Composio SDK directly.
-- Reads the API key from `--api-key` or `COMPOSIO_API_KEY`.
+- Supports two transports:
+  - direct Composio SDK mode for regular Composio API keys
+  - backend proxy MCP mode for Clawi-issued proxy tokens
+- Reads the API key or proxy token from `--api-key` or `COMPOSIO_API_KEY`.
+- Auto-selects proxy mode when `COMPOSIO_API_KEY` is a Clawi proxy token (`cmpx_...`).
+- In proxy mode, uses `COMPOSIO_MCP_URL` when it is present, otherwise builds the backend MCP endpoint from `CLAWI_API_BASE` plus `CLAWI_DEPLOYMENT_ID` or `TENANT_ID`.
 - Exposes one top-level command per supported toolkit.
 - Discovers the current action list for each toolkit from Composio at runtime, so it can support all current actions without hardcoding every slug.
-- Uses `GET /api/v3/connected_accounts` to shrink the visible CLI surface to toolkits that actually have an active connected account.
+- Uses `GET /api/v3/connected_accounts` in direct mode, and MCP `tools/list` in proxy mode, to shrink the visible CLI surface to toolkits that are actually available.
 - Disables toolkit commands when no active connected account exists for the effective user.
 - Prints guide-style help inspired by `mcporter`.
 - Hides low-signal metadata in text mode and keeps full fidelity in `--json`.
@@ -80,4 +84,15 @@ Optional live checks:
 
 ```bash
 COMPOSIO_API_KEY=... COMPOSIO_LIVE_TESTS=1 pnpm test
+```
+
+Proxy-mode live checks from an agent-like environment:
+
+```bash
+COMPOSIO_API_KEY=cmpx_... \
+COMPOSIO_MCP_URL=https://api.clawi.ai/api/deployments/<deployment-id>/composio/mcp \
+CLAWI_API_BASE=https://api.clawi.ai \
+CLAWI_DEPLOYMENT_ID=<deployment-id> \
+COMPOSIO_LIVE_TESTS=1 \
+pnpm test
 ```

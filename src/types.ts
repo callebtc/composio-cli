@@ -104,6 +104,14 @@ export interface ComposioGateway {
   ): Promise<ExecuteActionResult>;
 }
 
+export type EnvMap = Record<string, string | undefined>;
+
+export interface GatewayFactoryOptions {
+  apiKey: string;
+  baseUrl?: string | undefined;
+  env?: EnvMap | undefined;
+}
+
 export interface CliRunResult {
   exitCode: number;
   stdout: string;
@@ -111,9 +119,9 @@ export interface CliRunResult {
 }
 
 export interface CliRunOptions {
-  env?: Record<string, string | undefined>;
+  env?: EnvMap;
   stdinText?: string | undefined;
   stdinIsTTY?: boolean;
   stdoutIsTTY?: boolean;
-  gatewayFactory?: (options: { apiKey: string; baseUrl?: string }) => ComposioGateway;
+  gatewayFactory?: (options: GatewayFactoryOptions) => ComposioGateway;
 }

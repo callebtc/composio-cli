@@ -1,6 +1,12 @@
 export const CLI_NAME = "composio-cli";
 export const API_KEY_ENV = "COMPOSIO_API_KEY";
+export const COMPOSIO_MCP_URL_ENV = "COMPOSIO_MCP_URL";
+export const CLAWI_API_BASE_ENV = "CLAWI_API_BASE";
+export const CLAWI_DEPLOYMENT_ID_ENV = "CLAWI_DEPLOYMENT_ID";
+export const TENANT_ID_ENV = "TENANT_ID";
 export const DEFAULT_USER_ID = "default";
+export const DEFAULT_COMPOSIO_BASE_URL = "https://backend.composio.dev";
+export const DEFAULT_CLAWI_API_BASE = "https://api.clawi.ai";
+export const COMPOSIO_PROXY_TOKEN_PREFIX = "cmpx_";
 export const MAX_ACTIONS_PER_TOOLKIT = 9_999;
 export const TOOLKIT_PREVIEW_LIMIT = 8;
-
