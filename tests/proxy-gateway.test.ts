@@ -1,83 +1,53 @@
 import { describe, expect, it, vi } from "vitest";
-import {
-  ProxyComposioGateway,
-  buildProxyToolkitAction,
-  deriveProxyToolkitMetadata,
-} from "../src/composio/proxy-gateway.js";
+import { ProxyComposioGateway } from "../src/composio/proxy-gateway.js";
 import type { ToolkitAction } from "../src/types.js";
 
 describe("ProxyComposioGateway", () => {
-  it("lists toolkit actions over the backend proxy and reuses the MCP session", async () => {
+  it("lists connected accounts and toolkit actions through backend discovery endpoints", async () => {
     const fetchImpl = vi
       .fn<typeof fetch>()
       .mockResolvedValueOnce(
         new Response(
-          [
-            "event: message",
-            'data: {"jsonrpc":"2.0","id":"1","result":{"protocolVersion":"2025-03-26","capabilities":{}}}',
-            "",
-          ].join("\n"),
-          {
-            status: 200,
-            headers: {
-              "content-type": "text/event-stream",
-              "mcp-session-id": "session-1",
-            },
-          }
-        )
-      )
-      .mockResolvedValueOnce(
-        new Response(
-          [
-            "event: message",
-            'data: {"jsonrpc":"2.0","id":"2","error":{"code":-32601,"message":"Method not found"}}',
-            "",
-          ].join("\n"),
-          {
-            status: 200,
-            headers: {
-              "content-type": "text/event-stream",
-              "mcp-session-id": "session-1",
-            },
-          }
-        )
-      )
-      .mockResolvedValueOnce(
-        new Response(
-          [
-            "event: message",
-            `data: ${JSON.stringify({
-              jsonrpc: "2.0",
-              id: "3",
-              result: {
-                tools: [
-                  {
-                    name: "GMAIL_LIST_LABELS",
-                    description: "List Gmail labels.",
-                    inputSchema: { type: "object", properties: {} },
-                  },
-                  {
-                    name: "GMAIL_FETCH_EMAILS",
-                    description: "Fetch Gmail messages.",
-                    inputSchema: { type: "object", properties: { max_results: { type: "integer" } } },
-                  },
-                  {
-                    name: "GOOGLECALENDAR_LIST_CALENDARS",
-                    description: "List calendars.",
-                    inputSchema: { type: "object", properties: {} },
-                  },
-                ],
+          JSON.stringify({
+            user_id: "user-123",
+            items: [
+              {
+                id: "ca-1",
+                status: "ACTIVE",
+                user_id: "user-123",
+                is_disabled: false,
+                toolkit: { slug: "gmail" },
               },
-            })}`,
-            "",
-          ].join("\n"),
-          {
-            status: 200,
-            headers: {
-              "content-type": "text/event-stream",
-              "mcp-session-id": "session-1",
-            },
-          }
+            ],
+          }),
+          { status: 200, headers: { "content-type": "application/json" } }
+        )
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            items: [
+              {
+                slug: "GMAIL_LIST_LABELS",
+                name: "List Labels",
+                description: "List Gmail labels.",
+                version: "00000000_00",
+                input_parameters: { type: "object", properties: {} },
+                output_parameters: { type: "object", properties: {} },
+                toolkit: { slug: "gmail", name: "gmail" },
+              },
+              {
+                slug: "GMAIL_FETCH_EMAILS",
+                name: "Fetch Emails",
+                description: "Fetch Gmail messages.",
+                version: "00000000_00",
+                input_parameters: { type: "object", properties: { max_results: { type: "integer" } } },
+                output_parameters: { type: "object", properties: {} },
+                toolkit: { slug: "gmail", name: "gmail" },
+              },
+            ],
+          }),
+          { status: 200, headers: { "content-type": "application/json" } }
         )
       );
 
@@ -85,100 +55,56 @@ describe("ProxyComposioGateway", () => {
       apiKey: "cmpx_deadbeef.secret",
       proxyUrl: "https://api.clawi.ai/api/deployments/dep-1/composio/mcp",
       fetchImpl,
-      clientVersion: "1.2.3",
     });
 
-    const actions = await gateway.listToolkitActions("gmail", "GMAIL");
     const connections = await gateway.listConnectedAccounts({ statuses: ["ACTIVE"] });
+    const actions = await gateway.listToolkitActions("gmail", "GMAIL");
+    const userId = await gateway.getDefaultUserId();
 
-    expect(actions.map(action => action.cliName)).toEqual(["fetch-emails", "list-labels"]);
-    expect(actions.every(action => action.toolkitSlug === "gmail")).toBe(true);
     expect(connections).toEqual([
       {
-        id: "proxy:gmail",
+        id: "ca-1",
         status: "ACTIVE",
         toolkitSlug: "gmail",
-        userId: "default",
-        isDisabled: false,
-      },
-      {
-        id: "proxy:googlecalendar",
-        status: "ACTIVE",
-        toolkitSlug: "googlecalendar",
-        userId: "default",
+        userId: "user-123",
         isDisabled: false,
       },
     ]);
-    expect(fetchImpl).toHaveBeenCalledTimes(3);
+    expect(actions.map(action => action.cliName)).toEqual(["fetch-emails", "list-labels"]);
+    expect(actions.every(action => action.toolkitSlug === "gmail")).toBe(true);
+    expect(userId).toBe("user-123");
 
-    const initializeCall = fetchImpl.mock.calls[0];
-    const initializeBody = JSON.parse(String(initializeCall?.[1]?.body)) as {
-      method: string;
-      params: { clientInfo: { version: string } };
-    };
-    expect(initializeBody.method).toBe("initialize");
-    expect(initializeBody.params.clientInfo.version).toBe("1.2.3");
-
-    const toolsCall = fetchImpl.mock.calls[2];
-    expect((toolsCall?.[1]?.headers as Record<string, string>)["x-api-key"]).toBe(
-      "cmpx_deadbeef.secret"
+    expect(fetchImpl).toHaveBeenNthCalledWith(
+      1,
+      "https://api.clawi.ai/api/deployments/dep-1/composio/connected-accounts?statuses=ACTIVE",
+      expect.objectContaining({
+        headers: expect.any(Headers),
+      })
     );
-    expect((toolsCall?.[1]?.headers as Record<string, string>)["mcp-session-id"]).toBe(
-      "session-1"
+    expect(fetchImpl).toHaveBeenNthCalledWith(
+      2,
+      "https://api.clawi.ai/api/deployments/dep-1/composio/toolkits/gmail/tools?limit=9999",
+      expect.objectContaining({
+        headers: expect.any(Headers),
+      })
+    );
+    expect((fetchImpl.mock.calls[0]?.[1]?.headers as Headers).get("x-api-key")).toBe(
+      "cmpx_deadbeef.secret"
     );
   });
 
-  it("executes tool calls through the proxy and unwraps structured content", async () => {
-    const fetchImpl = vi
-      .fn<typeof fetch>()
-      .mockResolvedValueOnce(
-        new Response(
-          [
-            "event: message",
-            'data: {"jsonrpc":"2.0","id":"1","result":{"protocolVersion":"2025-03-26","capabilities":{}}}',
-            "",
-          ].join("\n"),
-          {
-            status: 200,
-            headers: {
-              "content-type": "text/event-stream",
-              "mcp-session-id": "session-9",
-            },
-          }
-        )
+  it("executes tool calls through backend execution endpoints", async () => {
+    const fetchImpl = vi.fn<typeof fetch>().mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          successful: true,
+          data: { labels: [{ id: "INBOX", name: "Inbox" }] },
+          error: null,
+          log_id: "log-1",
+        }),
+        { status: 200, headers: { "content-type": "application/json" } }
       )
-      .mockResolvedValueOnce(
-        new Response(
-          [
-            "event: message",
-            'data: {"jsonrpc":"2.0","id":"2","error":{"code":-32601,"message":"Method not found"}}',
-            "",
-          ].join("\n"),
-          {
-            status: 200,
-            headers: {
-              "content-type": "text/event-stream",
-              "mcp-session-id": "session-9",
-            },
-          }
-        )
-      )
-      .mockResolvedValueOnce(
-        new Response(
-          [
-            "event: message",
-            'data: {"jsonrpc":"2.0","id":"3","result":{"structuredContent":{"labels":[{"id":"INBOX","name":"Inbox"}]}}}',
-            "",
-          ].join("\n"),
-          {
-            status: 200,
-            headers: {
-              "content-type": "text/event-stream",
-              "mcp-session-id": "session-9",
-            },
-          }
-        )
-      );
+    );
 
     const gateway = new ProxyComposioGateway({
       apiKey: "cmpx_deadbeef.secret",
@@ -191,37 +117,36 @@ describe("ProxyComposioGateway", () => {
       name: "List Labels",
       description: "List Gmail labels.",
       toolkitSlug: "gmail",
+      toolkitName: "gmail",
+      version: "00000000_00",
       cliName: "list-labels",
       aliases: ["list-labels"],
       inputSchema: { type: "object", properties: {} },
     };
 
     const result = await gateway.executeAction(action, {
-      userId: "default",
+      userId: "user-123",
       input: {},
     });
 
-    expect(result.successful).toBe(true);
-    expect(result.data).toEqual({
-      labels: [{ id: "INBOX", name: "Inbox" }],
+    expect(result).toMatchObject({
+      successful: true,
+      data: { labels: [{ id: "INBOX", name: "Inbox" }] },
+      logId: "log-1",
+      toolSlug: "GMAIL_LIST_LABELS",
+      toolkitSlug: "gmail",
+      userId: "user-123",
     });
 
-    const executionCall = fetchImpl.mock.calls[2];
-    const executionBody = JSON.parse(String(executionCall?.[1]?.body)) as {
-      method: string;
-      params: {
-        name: string;
-        arguments: Record<string, unknown>;
-      };
-    };
-    expect(executionBody.method).toBe("tools/call");
-    expect(executionBody.params).toEqual({
-      name: "GMAIL_LIST_LABELS",
-      arguments: {},
-    });
-    expect((executionCall?.[1]?.headers as Record<string, string>)["mcp-session-id"]).toBe(
-      "session-9"
+    const request = fetchImpl.mock.calls[0];
+    expect(request?.[0]).toBe(
+      "https://api.clawi.ai/api/deployments/dep-1/composio/tools/GMAIL_LIST_LABELS/execute"
     );
+    expect(JSON.parse(String(request?.[1]?.body))).toEqual({
+      user_id: "user-123",
+      arguments: {},
+      version: "00000000_00",
+    });
   });
 
   it("surfaces backend proxy errors from HTTP responses", async () => {
@@ -235,9 +160,7 @@ describe("ProxyComposioGateway", () => {
         {
           status: 401,
           statusText: "Unauthorized",
-          headers: {
-            "content-type": "application/json",
-          },
+          headers: { "content-type": "application/json" },
         }
       )
     );
@@ -248,68 +171,8 @@ describe("ProxyComposioGateway", () => {
       fetchImpl,
     });
 
-    await expect(gateway.listToolkitActions("gmail", "GMAIL")).rejects.toThrow(
+    await expect(gateway.listConnectedAccounts({ statuses: ["ACTIVE"] })).rejects.toThrow(
       "401 Unauthorized: missing composio proxy token"
     );
-  });
-
-  it("surfaces JSON-RPC errors for non-notification calls returned over SSE", async () => {
-    const fetchImpl = vi.fn<typeof fetch>().mockResolvedValueOnce(
-      new Response(
-        [
-          "event: message",
-          'data: {"jsonrpc":"2.0","id":"1","error":{"code":-32001,"message":"bad initialize"}}',
-          "",
-        ].join("\n"),
-        {
-          status: 200,
-          headers: {
-            "content-type": "text/event-stream",
-          },
-        }
-      )
-    );
-
-    const gateway = new ProxyComposioGateway({
-      apiKey: "cmpx_deadbeef.secret",
-      proxyUrl: "https://api.clawi.ai/api/deployments/dep-1/composio/mcp",
-      fetchImpl,
-    });
-
-    await expect(gateway.listToolkitActions("gmail", "GMAIL")).rejects.toThrow(
-      "MCP initialize failed (-32001): bad initialize."
-    );
-  });
-});
-
-describe("proxy toolkit metadata", () => {
-  it("derives supported and runtime toolkit slugs from MCP tool names", () => {
-    expect(deriveProxyToolkitMetadata("GMAIL_LIST_LABELS")).toEqual({
-      toolkitSlug: "gmail",
-      toolPrefix: "GMAIL",
-    });
-    expect(deriveProxyToolkitMetadata("CUSTOM_WORKSPACE_CREATE_MESSAGE")).toEqual({
-      toolkitSlug: "custom_workspace",
-      toolPrefix: "CUSTOM_WORKSPACE",
-    });
-  });
-
-  it("builds toolkit actions from MCP tools", () => {
-    expect(
-      buildProxyToolkitAction(
-        {
-          name: "GOOGLECALENDAR_LIST_CALENDARS",
-          title: "List Calendars",
-          description: "List accessible calendars.",
-          inputSchema: { type: "object", properties: {} },
-        },
-        "googlecalendar",
-        "GOOGLECALENDAR"
-      )
-    ).toMatchObject({
-      slug: "GOOGLECALENDAR_LIST_CALENDARS",
-      cliName: "list-calendars",
-      toolkitSlug: "googlecalendar",
-    });
   });
 });

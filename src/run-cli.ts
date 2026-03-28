@@ -86,6 +86,11 @@ export async function runCli(argv: string[], options: CliRunOptions = {}): Promi
       effectiveUserIdCache = shared.userId;
       return effectiveUserIdCache;
     }
+    const explicitDefaultUserId = await gatewayOrError.gateway!.getDefaultUserId?.();
+    if (explicitDefaultUserId) {
+      effectiveUserIdCache = explicitDefaultUserId;
+      return effectiveUserIdCache;
+    }
     const accounts = await gatewayOrError.gateway!.listConnectedAccounts({
       statuses: ["ACTIVE"],
     });

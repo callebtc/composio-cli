@@ -94,6 +94,7 @@ export interface ComposioGateway {
     userId?: string;
     statuses?: string[];
   }): Promise<ConnectedAccountSummary[]>;
+  getDefaultUserId?(): Promise<string | undefined>;
   executeAction(
     action: ToolkitAction,
     options: {
