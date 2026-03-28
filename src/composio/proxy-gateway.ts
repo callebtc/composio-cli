@@ -54,6 +54,8 @@ interface MCPTool {
 }
 
 interface JSONRPCResponseEnvelope {
+  id?: string | number | null;
+  jsonrpc?: string;
   result?: unknown;
   error?: {
     code?: number;
@@ -218,7 +220,14 @@ export class ProxyComposioGateway implements ComposioGateway {
         version: this.clientVersion,
       },
     });
-    await this.callJSONRPC("notifications/initialized", {}, { notification: true });
+    try {
+      await this.callJSONRPC("notifications/initialized", {}, { notification: true });
+    } catch (error) {
+      if (isMethodNotFoundError(error)) {
+        return;
+      }
+      throw error;
+    }
   }
 
   private async callJSONRPC(
@@ -253,24 +262,23 @@ export class ProxyComposioGateway implements ComposioGateway {
     }
 
     const raw = await response.text();
+    const contentType = response.headers.get("content-type") ?? "";
     if (!response.ok) {
-      throw new Error(buildHTTPErrorMessage(response.status, response.statusText, raw));
+      throw new Error(buildHTTPErrorMessage(response.status, response.statusText, raw, contentType));
     }
-    if (options.notification || raw.trim() === "") {
+    if (raw.trim() === "") {
       return undefined;
     }
 
-    let payload: JSONRPCResponseEnvelope;
-    try {
-      payload = JSON.parse(raw) as JSONRPCResponseEnvelope;
-    } catch {
-      throw new Error(`MCP ${method} returned invalid JSON.`);
-    }
+    const payload = parseJSONRPCEnvelope(raw, contentType, method);
 
     if (payload.error) {
       throw new Error(
         `MCP ${method} failed${payload.error.code !== undefined ? ` (${payload.error.code})` : ""}: ${payload.error.message ?? "Unknown error"}.`
       );
+    }
+    if (options.notification) {
+      return undefined;
     }
     if (!("result" in payload)) {
       throw new Error(`MCP ${method} response was missing a result.`);
@@ -433,8 +441,68 @@ function parseMaybeJSON(value: string): unknown {
   }
 }
 
-function buildHTTPErrorMessage(status: number, statusText: string, raw: string): string {
-  const parsed = parseMaybeJSON(raw);
+function parseJSONRPCEnvelope(
+  raw: string,
+  contentType: string,
+  method: string
+): JSONRPCResponseEnvelope {
+  const trimmed = raw.trim();
+  if (trimmed === "") {
+    return {};
+  }
+
+  let parsed: unknown;
+  if (isEventStream(contentType)) {
+    parsed = parseSSEJSONPayload(trimmed);
+  } else {
+    parsed = parseMaybeJSON(trimmed);
+  }
+
+  if (!isRecord(parsed)) {
+    throw new Error(`MCP ${method} returned invalid JSON.`);
+  }
+
+  return parsed as JSONRPCResponseEnvelope;
+}
+
+function parseSSEJSONPayload(raw: string): unknown {
+  const events = raw
+    .split(/\n\n+/)
+    .map(chunk => chunk.trim())
+    .filter(Boolean);
+
+  for (const event of events) {
+    const dataLines = event
+      .split("\n")
+      .filter(line => line.startsWith("data:"))
+      .map(line => line.slice(5).trim())
+      .filter(Boolean);
+    if (dataLines.length === 0) {
+      continue;
+    }
+
+    const payload = dataLines.join("\n");
+    if (payload === "[DONE]") {
+      continue;
+    }
+
+    const parsed = parseMaybeJSON(payload);
+    if (isRecord(parsed)) {
+      return parsed;
+    }
+  }
+
+  throw new Error("MCP response event stream did not include a JSON payload.");
+}
+
+function buildHTTPErrorMessage(status: number, statusText: string, raw: string, contentType: string): string {
+  let parsed: unknown;
+  try {
+    parsed = isEventStream(contentType) ? parseSSEJSONPayload(raw.trim()) : parseMaybeJSON(raw);
+  } catch {
+    parsed = raw;
+  }
+
   if (isRecord(parsed)) {
     const nestedError = isRecord(parsed.error) ? parsed.error : undefined;
     const message =
@@ -449,6 +517,14 @@ function buildHTTPErrorMessage(status: number, statusText: string, raw: string):
     return `${status} ${statusText}: ${detail}`;
   }
   return `${status} ${statusText}`;
+}
+
+function isEventStream(contentType: string): boolean {
+  return contentType.toLowerCase().includes("text/event-stream");
+}
+
+function isMethodNotFoundError(error: unknown): boolean {
+  return error instanceof Error && /\(-32601\): Method not found\./.test(error.message);
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

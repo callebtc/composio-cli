@@ -12,53 +12,69 @@ describe("ProxyComposioGateway", () => {
       .fn<typeof fetch>()
       .mockResolvedValueOnce(
         new Response(
-          JSON.stringify({
-            jsonrpc: "2.0",
-            id: "1",
-            result: {
-              protocolVersion: "2025-03-26",
-              capabilities: {},
-            },
-          }),
+          [
+            "event: message",
+            'data: {"jsonrpc":"2.0","id":"1","result":{"protocolVersion":"2025-03-26","capabilities":{}}}',
+            "",
+          ].join("\n"),
           {
             status: 200,
             headers: {
-              "content-type": "application/json",
+              "content-type": "text/event-stream",
               "mcp-session-id": "session-1",
             },
           }
         )
       )
-      .mockResolvedValueOnce(new Response(null, { status: 204 }))
       .mockResolvedValueOnce(
         new Response(
-          JSON.stringify({
-            jsonrpc: "2.0",
-            id: "3",
-            result: {
-              tools: [
-                {
-                  name: "GMAIL_LIST_LABELS",
-                  description: "List Gmail labels.",
-                  inputSchema: { type: "object", properties: {} },
-                },
-                {
-                  name: "GMAIL_FETCH_EMAILS",
-                  description: "Fetch Gmail messages.",
-                  inputSchema: { type: "object", properties: { max_results: { type: "integer" } } },
-                },
-                {
-                  name: "GOOGLECALENDAR_LIST_CALENDARS",
-                  description: "List calendars.",
-                  inputSchema: { type: "object", properties: {} },
-                },
-              ],
-            },
-          }),
+          [
+            "event: message",
+            'data: {"jsonrpc":"2.0","id":"2","error":{"code":-32601,"message":"Method not found"}}',
+            "",
+          ].join("\n"),
           {
             status: 200,
             headers: {
-              "content-type": "application/json",
+              "content-type": "text/event-stream",
+              "mcp-session-id": "session-1",
+            },
+          }
+        )
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          [
+            "event: message",
+            `data: ${JSON.stringify({
+              jsonrpc: "2.0",
+              id: "3",
+              result: {
+                tools: [
+                  {
+                    name: "GMAIL_LIST_LABELS",
+                    description: "List Gmail labels.",
+                    inputSchema: { type: "object", properties: {} },
+                  },
+                  {
+                    name: "GMAIL_FETCH_EMAILS",
+                    description: "Fetch Gmail messages.",
+                    inputSchema: { type: "object", properties: { max_results: { type: "integer" } } },
+                  },
+                  {
+                    name: "GOOGLECALENDAR_LIST_CALENDARS",
+                    description: "List calendars.",
+                    inputSchema: { type: "object", properties: {} },
+                  },
+                ],
+              },
+            })}`,
+            "",
+          ].join("\n"),
+          {
+            status: 200,
+            headers: {
+              "content-type": "text/event-stream",
               "mcp-session-id": "session-1",
             },
           }
@@ -117,39 +133,47 @@ describe("ProxyComposioGateway", () => {
       .fn<typeof fetch>()
       .mockResolvedValueOnce(
         new Response(
-          JSON.stringify({
-            jsonrpc: "2.0",
-            id: "1",
-            result: {
-              protocolVersion: "2025-03-26",
-              capabilities: {},
-            },
-          }),
+          [
+            "event: message",
+            'data: {"jsonrpc":"2.0","id":"1","result":{"protocolVersion":"2025-03-26","capabilities":{}}}',
+            "",
+          ].join("\n"),
           {
             status: 200,
             headers: {
-              "content-type": "application/json",
+              "content-type": "text/event-stream",
               "mcp-session-id": "session-9",
             },
           }
         )
       )
-      .mockResolvedValueOnce(new Response(null, { status: 204 }))
       .mockResolvedValueOnce(
         new Response(
-          JSON.stringify({
-            jsonrpc: "2.0",
-            id: "3",
-            result: {
-              structuredContent: {
-                labels: [{ id: "INBOX", name: "Inbox" }],
-              },
-            },
-          }),
+          [
+            "event: message",
+            'data: {"jsonrpc":"2.0","id":"2","error":{"code":-32601,"message":"Method not found"}}',
+            "",
+          ].join("\n"),
           {
             status: 200,
             headers: {
-              "content-type": "application/json",
+              "content-type": "text/event-stream",
+              "mcp-session-id": "session-9",
+            },
+          }
+        )
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          [
+            "event: message",
+            'data: {"jsonrpc":"2.0","id":"3","result":{"structuredContent":{"labels":[{"id":"INBOX","name":"Inbox"}]}}}',
+            "",
+          ].join("\n"),
+          {
+            status: 200,
+            headers: {
+              "content-type": "text/event-stream",
               "mcp-session-id": "session-9",
             },
           }
@@ -226,6 +250,34 @@ describe("ProxyComposioGateway", () => {
 
     await expect(gateway.listToolkitActions("gmail", "GMAIL")).rejects.toThrow(
       "401 Unauthorized: missing composio proxy token"
+    );
+  });
+
+  it("surfaces JSON-RPC errors for non-notification calls returned over SSE", async () => {
+    const fetchImpl = vi.fn<typeof fetch>().mockResolvedValueOnce(
+      new Response(
+        [
+          "event: message",
+          'data: {"jsonrpc":"2.0","id":"1","error":{"code":-32001,"message":"bad initialize"}}',
+          "",
+        ].join("\n"),
+        {
+          status: 200,
+          headers: {
+            "content-type": "text/event-stream",
+          },
+        }
+      )
+    );
+
+    const gateway = new ProxyComposioGateway({
+      apiKey: "cmpx_deadbeef.secret",
+      proxyUrl: "https://api.clawi.ai/api/deployments/dep-1/composio/mcp",
+      fetchImpl,
+    });
+
+    await expect(gateway.listToolkitActions("gmail", "GMAIL")).rejects.toThrow(
+      "MCP initialize failed (-32001): bad initialize."
     );
   });
 });
