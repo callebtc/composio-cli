@@ -30,14 +30,14 @@ describe("gateway transport resolution", () => {
       resolveGatewayConfig({
         apiKey: "cmpx_deadbeef.secret",
         env: {
-          COMPOSIO_MCP_URL: "https://api.clawi.ai/api/deployments/dep-1/composio/mcp",
+          COMPOSIO_MCP_URL: "https://api.clawi.ai/api/deployments/dep-1/composio",
           CLAWI_DEPLOYMENT_ID: "dep-1",
         },
       })
     ).toEqual({
       mode: "proxy",
       apiKey: "cmpx_deadbeef.secret",
-      proxyUrl: "https://api.clawi.ai/api/deployments/dep-1/composio/mcp",
+      proxyUrl: "https://api.clawi.ai/api/deployments/dep-1/composio",
       deploymentID: "dep-1",
     });
   });
@@ -48,7 +48,7 @@ describe("gateway transport resolution", () => {
         CLAWI_API_BASE: "https://api.internal.clawi.ai/",
         CLAWI_DEPLOYMENT_ID: "dep-42",
       })
-    ).toBe("https://api.internal.clawi.ai/api/deployments/dep-42/composio/mcp");
+    ).toBe("https://api.internal.clawi.ai/api/deployments/dep-42/composio");
   });
 
   it("uses TENANT_ID as a deployment fallback", () => {
@@ -60,6 +60,17 @@ describe("gateway transport resolution", () => {
   });
 
   it("treats an explicit proxy endpoint as final", () => {
+    expect(
+      resolveProxyURL(
+        "https://api.clawi.ai/api/deployments/dep-9/composio",
+        {
+          CLAWI_DEPLOYMENT_ID: "ignored",
+        }
+      )
+    ).toBe("https://api.clawi.ai/api/deployments/dep-9/composio");
+  });
+
+  it("keeps the legacy mcp proxy endpoint unchanged", () => {
     expect(
       resolveProxyURL(
         "https://api.clawi.ai/api/deployments/dep-9/composio/mcp",
@@ -78,7 +89,7 @@ describe("gateway transport resolution", () => {
           TENANT_ID: "dep-99",
         }
       )
-    ).toBe("https://custom-api.clawi.ai/api/deployments/dep-99/composio/mcp");
+    ).toBe("https://custom-api.clawi.ai/api/deployments/dep-99/composio");
   });
 
   it("requires deployment context when building a proxy URL", () => {

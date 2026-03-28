@@ -78,7 +78,7 @@ function buildProxyURL(apiBase: string, deploymentID: string | undefined): strin
     );
   }
 
-  return `${apiBase.replace(/\/+$/, "")}/api/deployments/${encodeURIComponent(deploymentID)}/composio/mcp`;
+  return `${apiBase.replace(/\/+$/, "")}/api/deployments/${encodeURIComponent(deploymentID)}/composio`;
 }
 
 function firstNonEmpty(...values: Array<string | undefined>): string | undefined {
@@ -92,5 +92,5 @@ function firstNonEmpty(...values: Array<string | undefined>): string | undefined
 }
 
 function isProxyEndpointURL(value: string): boolean {
-  return /\/api\/deployments\/[^/]+\/composio\/mcp\/?$/i.test(value);
+  return /\/api\/deployments\/[^/]+\/composio(?:\/mcp)?\/?$/i.test(value);
 }
