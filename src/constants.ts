@@ -1,6 +1,6 @@
 export const CLI_NAME = "composio-cli";
 export const API_KEY_ENV = "COMPOSIO_API_KEY";
-export const COMPOSIO_MCP_URL_ENV = "COMPOSIO_MCP_URL";
+export const CLAWI_COMPOSIO_BASE_URL_ENV = "CLAWI_COMPOSIO_BASE_URL";
 export const CLAWI_API_BASE_ENV = "CLAWI_API_BASE";
 export const CLAWI_DEPLOYMENT_ID_ENV = "CLAWI_DEPLOYMENT_ID";
 export const TENANT_ID_ENV = "TENANT_ID";

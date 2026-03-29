@@ -1,7 +1,7 @@
 import {
   CLAWI_API_BASE_ENV,
+  CLAWI_COMPOSIO_BASE_URL_ENV,
   CLAWI_DEPLOYMENT_ID_ENV,
-  COMPOSIO_MCP_URL_ENV,
   COMPOSIO_PROXY_TOKEN_PREFIX,
   DEFAULT_CLAWI_API_BASE,
   TENANT_ID_ENV,
@@ -63,7 +63,7 @@ export function resolveProxyURL(
     return buildProxyURL(explicitBase, deploymentID);
   }
 
-  const explicitProxyURL = firstNonEmpty(env[COMPOSIO_MCP_URL_ENV]);
+  const explicitProxyURL = firstNonEmpty(env[CLAWI_COMPOSIO_BASE_URL_ENV]);
   if (explicitProxyURL) {
     return explicitProxyURL;
   }
@@ -74,7 +74,7 @@ export function resolveProxyURL(
 function buildProxyURL(apiBase: string, deploymentID: string | undefined): string {
   if (!deploymentID) {
     throw new Error(
-      "Composio proxy token requires COMPOSIO_MCP_URL or CLAWI_API_BASE plus CLAWI_DEPLOYMENT_ID/TENANT_ID."
+      "Composio proxy token requires CLAWI_COMPOSIO_BASE_URL or CLAWI_API_BASE plus CLAWI_DEPLOYMENT_ID/TENANT_ID."
     );
   }
 

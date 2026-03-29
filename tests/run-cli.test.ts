@@ -365,7 +365,7 @@ describe("runCli", () => {
 
     const env = {
       COMPOSIO_API_KEY: "cmpx_deadbeef.secret",
-      COMPOSIO_MCP_URL: "https://api.clawi.ai/api/deployments/dep-1/composio/mcp",
+      CLAWI_COMPOSIO_BASE_URL: "https://api.clawi.ai/api/deployments/dep-1/composio",
       CLAWI_API_BASE: "https://api.clawi.ai",
       CLAWI_DEPLOYMENT_ID: "dep-1",
     };

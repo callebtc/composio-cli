@@ -30,7 +30,7 @@ describe("gateway transport resolution", () => {
       resolveGatewayConfig({
         apiKey: "cmpx_deadbeef.secret",
         env: {
-          COMPOSIO_MCP_URL: "https://api.clawi.ai/api/deployments/dep-1/composio",
+          CLAWI_COMPOSIO_BASE_URL: "https://api.clawi.ai/api/deployments/dep-1/composio",
           CLAWI_DEPLOYMENT_ID: "dep-1",
         },
       })
@@ -98,7 +98,7 @@ describe("gateway transport resolution", () => {
         CLAWI_API_BASE: "https://api.clawi.ai",
       })
     ).toThrow(
-      "Composio proxy token requires COMPOSIO_MCP_URL or CLAWI_API_BASE plus CLAWI_DEPLOYMENT_ID/TENANT_ID."
+      "Composio proxy token requires CLAWI_COMPOSIO_BASE_URL or CLAWI_API_BASE plus CLAWI_DEPLOYMENT_ID/TENANT_ID."
     );
   });
 });
