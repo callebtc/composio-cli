@@ -57,26 +57,11 @@ node dist/cli.js <toolkit> <action> --input '{"key":"value"}'
 ## Important behavior
 
 - The CLI only shows toolkits with an active connected account for the effective user.
-- Action lists are discovered live from Composio at runtime.
 - Text mode hides low-signal metadata.
 - Summary-capable read actions default to compact text output.
 - Use `--json` for the full machine-readable payload.
 - Use `--full` to bypass the compact summary in text mode.
 - Use `--fields a,b` or `--ids-only` to reduce context further.
-
-## Authentication
-
-Set the API key once at the beginning:
-
-```bash
-export COMPOSIO_API_KEY="..."
-```
-
-If needed, target a specific user with:
-
-```bash
---user <id>
-```
 
 ## Recommended command pattern
 
@@ -146,25 +131,6 @@ node dist/cli.js google-maps get-route --origin "Berlin" --destination "Munich"
 node dist/cli.js google-maps autocomplete --input "berlin cen"
 ```
 
-Other common toolkit entry points:
-
-```bash
-node dist/cli.js google-drive actions
-node dist/cli.js google-sheets actions
-node dist/cli.js slack actions
-node dist/cli.js github actions
-node dist/cli.js notion actions
-node dist/cli.js linear actions
-node dist/cli.js jira actions
-node dist/cli.js airtable actions
-node dist/cli.js asana actions
-node dist/cli.js trello actions
-node dist/cli.js dropbox actions
-node dist/cli.js figma actions
-node dist/cli.js youtube actions
-node dist/cli.js spotify actions
-node dist/cli.js composio-search actions
-```
 
 ## Agent guidance
 
