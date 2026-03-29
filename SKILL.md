@@ -17,12 +17,6 @@ npm install -g composio-cli
 npm link
 ```
 
-Set the API key once for the session:
-
-```bash
-export COMPOSIO_API_KEY="..."
-```
-
 ## Connecting New Accounts
 
 If the user asks you to interact with a service (e.g., Jira, Slack) but it is not currently enabled or connected, **do not** attempt to build an OAuth flow or write custom API integration code.
